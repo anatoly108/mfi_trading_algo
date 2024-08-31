@@ -7,9 +7,7 @@ from datetime import datetime, timedelta
 from tqdm import tqdm
 from binance.client import Client
 from scipy.signal import find_peaks
-import matplotlib.pyplot as plt
-import mplfinance as mpf
-from functions import load_config, setup_logging, get_1m_candles, calculate_mfi, find_extrema, real_time_extrema
+from functions import load_config, setup_logging, get_1m_candles, calculate_mfi, find_extrema, real_time_extrema, plot_asset
 
 def calculate_price_change(candles, minima, maxima):
     changes = []
@@ -46,51 +44,17 @@ def analyze_pair(symbol):
         "sell_signals": sell_signals
     }
 
-def plot_asset(asset_data):
-    symbol = asset_data["symbol"]
-    candles = asset_data["candles"]
-    mfi = asset_data["mfi"]
-    buy_signals = asset_data["buy_signals"]
-    sell_signals = asset_data["sell_signals"]
-
-    # Convert candles to a DataFrame
-    df = pd.DataFrame(candles, columns=["timestamp", "open", "high", "low", "close", "volume", "close_time", "qav", "num_trades", "tbbav", "tbqav", "ignore"])
-    df["timestamp"] = pd.to_datetime(df["timestamp"], unit='ms')
-    df.set_index("timestamp", inplace=True)
-    df = df.astype(float)
-    # Create a figure with two subplots (one for the candlestick chart and one for MFI)
-    fig, (ax1, ax2) = plt.subplots(2, 1, figsize=(12, 8), gridspec_kw={'height_ratios': [3, 1]})
-
-    # Plot the candlestick chart on the first subplot
-    mpf.plot(df, type='candle', ax=ax1, volume=False, show_nontrading=True)
-
-    # Plot MFI on the second subplot
-    ax2.plot(df.index, mfi, color='blue', label='MFI')
-
-    # Adding buy/sell signals to both charts
-    # On the price chart
-    ax1.scatter(df.index[buy_signals], df["close"].iloc[buy_signals], color='green', label='Buy Signal', marker='o')
-    ax1.scatter(df.index[sell_signals], df["close"].iloc[sell_signals], color='red', label='Sell Signal', marker='o')
-
-    # On the MFI chart
-    ax2.scatter(df.index[buy_signals], mfi[buy_signals], color='green', marker='o')
-    ax2.scatter(df.index[sell_signals], mfi[sell_signals], color='red', marker='o')
-
-    # Labels and legends
-    ax1.set_title(f'{symbol} Price and Buy/Sell Signals')
-    ax2.set_title('Money Flow Index (MFI)')
-
-    ax1.legend()
-    ax2.legend()
-
-    plt.tight_layout()
-    plt.savefig(f'out/{symbol}_chart.png')
-    # plt.show()
-    plt.close()
-
 def main():
     client = Client()
-    symbols = [symbol['symbol'] for symbol in client.get_all_tickers() if symbol['symbol'].endswith('USDT')]
+    # Fetch exchange information
+    exchange_info = client.get_exchange_info()
+
+    # Filter symbols that end with 'USDT' and are available for spot trading
+    symbols = [
+        symbol['symbol'] 
+        for symbol in exchange_info['symbols'] 
+        if symbol['symbol'].endswith('USDT') and symbol['status'] == 'TRADING' and symbol['isSpotTradingAllowed']
+    ]
     
     results = []
     for symbol in tqdm(symbols):  # Limiting to first 10 for testing

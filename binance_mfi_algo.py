@@ -8,27 +8,29 @@ from datetime import datetime, timedelta
 import talib as ta
 import numpy as np
 import requests
-from functions import load_config, setup_logging, get_1m_candles, calculate_mfi, find_extrema, real_time_extrema
+from functions import load_config, setup_logging, get_1m_candles, calculate_mfi, find_extrema, real_time_extrema, plot_asset
 
-def execute_trade(symbol, quantity, action):
-    # Replace these with your Binance API credentials
-    API_KEY = 'your_api_key'
-    API_SECRET = 'your_api_secret'
-    client = Client(API_KEY, API_SECRET)
+def execute_trade(symbol, quantity, action, config_path, dry_run):
+    config = load_config(config_path)
+    client = Client(config['api_key'], config['api_secret'])
     
+    if dry_run:
+        logging.info(f"Dry run {action}")
+        return {'price': None}
+
     if action == 'buy':
         order = client.order_market_buy(symbol=symbol, quantity=quantity)
         logging.info(f"Market Buy Order: {order}")
     elif action == 'sell':
         order = client.order_market_sell(symbol=symbol, quantity=quantity)
         logging.info(f"Market Sell Order: {order}")
+    
+    client.close_connection()
 
-def main(symbol, quantity):
-    setup_logging()
+def main(symbol, quantity, config_path, dry_run, negative_cancel_num=4):
+    setup_logging(f"{symbol}_")
     
     start_time = datetime.now()
-    last_profit = 0
-    profits = []
     
     # Load initial candles and MFI
     candles = get_1m_candles(symbol)
@@ -39,6 +41,9 @@ def main(symbol, quantity):
     bought = False
     really_new_candles = []
     total_profit = 0
+    buy_signals = []
+    sell_signals = []
+    profits = []
 
     for i in range(1, len(mfi)):
         mfi_i = mfi[i]
@@ -50,6 +55,14 @@ def main(symbol, quantity):
     while True:
         # Recalculate MFI with the new candle(s)
         mfi = calculate_mfi(candles)
+        plot_asset({
+            "symbol": symbol,
+            "candles": candles,
+            "mfi": mfi,
+            "buy_signals": buy_signals,
+            "sell_signals": sell_signals
+        })
+
         # We have to account for the case when we get >1 new candle
         mfi_new_from = len(mfi) - len(really_new_candles)
         mfi_new_to = len(mfi)
@@ -66,12 +79,17 @@ def main(symbol, quantity):
                 last_local_minima = 100
                 bought = True
                 # buy signal
-                buy_price = float(candles[i][4]) # TODO: replace with real price from the market order
+                order = execute_trade(symbol, quantity, "buy", config_path, dry_run)
+                if order["price"] is None:
+                    buy_price = float(candles[i][4]) # take last close price for dry run
+                else:
+                    buy_price = order["price"]
+                buy_signals.append(i)
                 logging.info(f"Buy signal: price {buy_price}, MFI {mfi_i}")
                 break # this will break only from the mfi for loop - we can't sell inside this for loop because we would sell for the same price
 
             if not bought:
-                logging.info(f"Not bought, MFI {mfi_i}")
+                logging.info(f"Not bought, new MFI value: {mfi_i}")
                 continue
 
             # maxima
@@ -83,13 +101,24 @@ def main(symbol, quantity):
                 last_local_maxima = 0
                 bought = False
                 # sell signal
-                sell_price = float(candles[i][4])
+                order = execute_trade(symbol, quantity, "sell", config_path, dry_run)
+
+                if order["price"] is None:
+                    sell_price = float(candles[i][4]) # take last close price for dry run
+                else:
+                    sell_price = order["price"]
+
+                sell_signals.append(i)
                 logging.info(f"Sell signal: price {sell_price}, MFI {mfi_i}")
+
+                sell_final = sell_price * quantity
+                buy_final = buy_price * quantity
                 
-                profit = (sell_price/buy_price)*100
+                profit = sell_final - buy_final
                 total_profit += profit
-                logging.info(f"Current trade profit: {profit}%")
-                logging.info(f"Total profit: {profit}%")
+                profits.append(profit)
+                logging.info(f"Current trade profit: {profit} USDT")
+                logging.info(f"Total profit: {total_profit} USDT")
 
         # Sleep for 60 seconds before fetching new data
         logging.info("Waiting for the next candle")
@@ -106,23 +135,25 @@ def main(symbol, quantity):
             continue
         logging.info(f"Got {len(really_new_candles)} new candle(s)") 
         candles.extend(really_new_candles)
-
-        # Simulate profit calculation (actual implementation will vary)
-        # Assuming profit calculation based on buy/sell orders
-        # current_profit = 0  # Placeholder for actual profit calculation
-        # profits.append(current_profit)
         
-        # Check last 3 profits
-        # if len(profits) > 3 and all(p <= 0 for p in profits[-3:]):
-        #     logging.info("Negative profit in last 3 iterations. Exiting.")
-        #     break
+        # Check last 4 profits
+        if len(profits) >= negative_cancel_num and all(p < 0 for p in profits[-negative_cancel_num:]):
+            logging.info(f"Negative profit in last {negative_cancel_num} iterations. Exiting.")
+            break
 
         # Check elapsed time
         if datetime.now() - start_time > timedelta(hours=24):
             logging.info("Running time exceeded 24 hours. Exiting.")
             break
 
+    logging.info(f"Finished. Total profit: {total_profit}")
+
 if __name__ == "__main__":
-    asset = 'BTCUSDT'  # Example asset
-    quantity = 0.01    # Example quantity
-    main(asset, quantity)
+    parser = argparse.ArgumentParser(description="")
+    parser.add_argument("--config", required=True, help="Path to the YAML config file containing API keys")
+    parser.add_argument("--symbol", required=True, help="Symbol, e.g. BTCUSDT")
+    parser.add_argument("--quantity", required=True, help="Quantity to operate with")
+    parser.add_argument("--dry-run", action="store_true")
+
+    args = parser.parse_args()
+    main(args.symbol, args.quantity, args.config, args.dry_run)
