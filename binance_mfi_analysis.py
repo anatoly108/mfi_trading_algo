@@ -7,7 +7,7 @@ from datetime import datetime, timedelta
 from tqdm import tqdm
 from binance.client import Client
 from scipy.signal import find_peaks
-from functions import load_config, setup_logging, get_1m_candles, calculate_mfi, find_extrema, real_time_extrema, plot_asset
+from functions import load_config, setup_logging, get_1m_candles, calculate_mfi, find_extrema, real_time_extrema, plot_asset, get_candles, MFI_TIMEINTERVAL
 
 def calculate_price_change(candles, minima, maxima):
     changes = []
@@ -19,11 +19,11 @@ def calculate_price_change(candles, minima, maxima):
     return changes
 
 def analyze_pair(symbol):
-    candles = get_1m_candles(symbol)
+    candles = get_candles(symbol, "1m", "1440")
     if len(candles) == 0:
         return None
     
-    mfi = calculate_mfi(candles)
+    mfi = calculate_mfi(candles, MFI_TIMEINTERVAL)
     troughs, peaks = find_extrema(mfi)
     buy_signals, sell_signals = real_time_extrema(mfi)
     
@@ -77,8 +77,9 @@ def main():
 
     # Create a DataFrame from the subset results
     df = pd.DataFrame(subset_results)
-    df.to_csv("out/crypto_mfi_analysis.csv", index=False)
-    df.to_excel("out/crypto_mfi_analysis.xlsx", index=False)
+    filename_suffix = datetime.now().strftime('%Y_%m_%d_%H_%M_%S')
+    df.to_csv(f"out/{filename_suffix}_crypto_mfi_analysis.csv", index=False)
+    df.to_excel(f"out/{filename_suffix}_crypto_mfi_analysis.xlsx", index=False)
 
     # Select top 10 assets based on highest real_time_sum_change
     top_assets = df.nlargest(10, 'real_time_sum_change')
@@ -86,7 +87,7 @@ def main():
 
     # Plotting each of the top 10 assets
     for asset in results_top:
-        plot_asset(asset)
+        plot_asset(asset, "_analysis")
 
 if __name__ == "__main__":
     main()

@@ -11,6 +11,11 @@ import matplotlib.pyplot as plt
 import mplfinance as mpf
 import yaml
 
+MFI_THRESHOLD_LOW = 25
+MFI_THRESHOLD_HIGH = 75
+MFI_STEP_THRESHOLD = 3
+MFI_TIMEINTERVAL = 14
+
 def load_config(config_file):
     with open(config_file, 'r') as file:
         return yaml.safe_load(file)
@@ -32,17 +37,23 @@ def setup_logging(file_suffix=""):
         ]
     )
 
-def get_1m_candles(symbol):
-    url = f"https://api.binance.com/api/v3/klines?symbol={symbol}&interval=1m&limit=1440"
+def get_candles(symbol, interval, limit):
+    url = f"https://api.binance.com/api/v3/klines?symbol={symbol}&interval={interval}&limit={limit}"
     response = requests.get(url)
     return response.json()
 
-def calculate_mfi(candles):
+def get_1m_candles(symbol):
+    get_candles(symbol, "1m", "1440")
+    url = f"https://api.binance.com/api/v3/klines?symbol={symbol}&interval=1m&limit=1440" # 24h
+    response = requests.get(url)
+    return response.json()
+
+def calculate_mfi(candles, timeperiod=14):
     high = np.array([float(c[2]) for c in candles])
     low = np.array([float(c[3]) for c in candles])
     close = np.array([float(c[4]) for c in candles])
     volume = np.array([float(c[5]) for c in candles])
-    return ta.MFI(high, low, close, volume, timeperiod=14)
+    return ta.MFI(high, low, close, volume, timeperiod=timeperiod)
 
 def find_extrema(data):
     peaks, _ = find_peaks(data, distance=30)
@@ -62,11 +73,11 @@ def real_time_extrema(mfi):
         mfi_i = mfi[i]
         
         # minima
-        if mfi_i < 30 and mfi_i < last_local_minima:
+        if mfi_i < MFI_THRESHOLD_LOW and mfi_i < last_local_minima:
             last_local_minima = mfi_i
 
         diff_to_minima = mfi_i - last_local_minima 
-        if mfi_i < 30 and mfi_i > last_local_minima and diff_to_minima > 2 and not bought:
+        if mfi_i < MFI_THRESHOLD_LOW and mfi_i > last_local_minima and diff_to_minima > MFI_STEP_THRESHOLD and not bought:
             last_local_minima = 100
             bought = True
             buy_signals.append(i) # buy signal
@@ -75,11 +86,11 @@ def real_time_extrema(mfi):
             continue
 
         # maxima
-        if mfi_i > 70 and mfi_i > last_local_maxima:
+        if mfi_i > MFI_THRESHOLD_HIGH and mfi_i > last_local_maxima:
             last_local_maxima = mfi_i
 
         diff_to_maxima = last_local_maxima - mfi_i
-        if mfi_i > 70 and mfi_i < last_local_maxima and diff_to_maxima > 2:
+        if mfi_i > MFI_THRESHOLD_HIGH and mfi_i < last_local_maxima and diff_to_maxima > MFI_STEP_THRESHOLD:
             last_local_maxima = 0
             bought = False
             sell_signals.append(i) # sell signal
@@ -87,7 +98,7 @@ def real_time_extrema(mfi):
     return buy_signals, sell_signals
 
 
-def plot_asset(asset_data):
+def plot_asset(asset_data, plot_suffix=""):
     symbol = asset_data["symbol"]
     candles = asset_data["candles"]
     mfi = asset_data["mfi"]
@@ -100,10 +111,10 @@ def plot_asset(asset_data):
     df.set_index("timestamp", inplace=True)
     df = df.astype(float)
     # Create a figure with two subplots (one for the candlestick chart and one for MFI)
-    fig, (ax1, ax2) = plt.subplots(2, 1, figsize=(12, 8), gridspec_kw={'height_ratios': [3, 1]})
+    fig, (ax1, ax2) = plt.subplots(2, 1, figsize=(24, 8), gridspec_kw={'height_ratios': [3, 1]})
 
     # Plot the candlestick chart on the first subplot
-    mpf.plot(df, type='candle', ax=ax1, volume=False, show_nontrading=True)
+    mpf.plot(df, type='line', ax=ax1, volume=False, show_nontrading=True)
 
     # Plot MFI on the second subplot
     ax2.plot(df.index, mfi, color='blue', label='MFI')
@@ -125,6 +136,6 @@ def plot_asset(asset_data):
     ax2.legend()
 
     plt.tight_layout()
-    plt.savefig(f'out/{symbol}_chart.png')
+    plt.savefig(f'out/{symbol}_chart{plot_suffix}.png')
     # plt.show()
     plt.close()

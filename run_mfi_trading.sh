@@ -18,3 +18,10 @@ python binance_mfi_algo.py --config keys.yaml \
     --symbol IRISUSDT \
     --quantity 1000 \
     --dry-run &
+
+sleep 2
+
+python binance_mfi_algo.py --config keys.yaml \
+    --symbol AKROUSDT \
+    --quantity 10000 \
+    --dry-run &
