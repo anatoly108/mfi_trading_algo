@@ -9,60 +9,7 @@ from binance.client import Client
 from scipy.signal import find_peaks
 import matplotlib.pyplot as plt
 import mplfinance as mpf
-
-def get_1m_candles(symbol):
-    url = f"https://api.binance.com/api/v3/klines?symbol={symbol}&interval=1m&limit=1440"
-    response = requests.get(url)
-    return response.json()
-
-def calculate_mfi(candles):
-    high = np.array([float(c[2]) for c in candles])
-    low = np.array([float(c[3]) for c in candles])
-    close = np.array([float(c[4]) for c in candles])
-    volume = np.array([float(c[5]) for c in candles])
-    return ta.MFI(high, low, close, volume, timeperiod=14)
-
-def find_extrema(data):
-    peaks, _ = find_peaks(data, distance=30)
-    troughs, _ = find_peaks(-data, distance=30)
-    return troughs, peaks
-
-def real_time_extrema(mfi):
-    buy_signals = []
-    sell_signals = []
-
-    last_local_minima = 100
-    last_local_maxima = 0
-
-    bought = False
-    
-    for i in range(1, len(mfi)):
-        mfi_i = mfi[i]
-        
-        # minima
-        if mfi_i < 30 and mfi_i < last_local_minima:
-            last_local_minima = mfi_i
-
-        diff_to_minima = mfi_i - last_local_minima 
-        if mfi_i < 30 and mfi_i > last_local_minima and diff_to_minima > 2 and not bought:
-            last_local_minima = 100
-            bought = True
-            buy_signals.append(i) # buy signal
-        
-        if not bought:
-            continue
-
-        # maxima
-        if mfi_i > 70 and mfi_i > last_local_maxima:
-            last_local_maxima = mfi_i
-
-        diff_to_maxima = last_local_maxima - mfi_i
-        if mfi_i > 70 and mfi_i < last_local_maxima and diff_to_maxima > 2:
-            last_local_maxima = 0
-            bought = False
-            sell_signals.append(i) # sell signal
-
-    return buy_signals, sell_signals
+from functions import load_config, setup_logging, get_1m_candles, calculate_mfi, find_extrema, real_time_extrema
 
 def calculate_price_change(candles, minima, maxima):
     changes = []
@@ -139,6 +86,7 @@ def plot_asset(asset_data):
     plt.tight_layout()
     plt.savefig(f'out/{symbol}_chart.png')
     # plt.show()
+    plt.close()
 
 def main():
     client = Client()
@@ -165,8 +113,8 @@ def main():
 
     # Create a DataFrame from the subset results
     df = pd.DataFrame(subset_results)
-    df.to_csv("crypto_mfi_analysis.csv", index=False)
-    df.to_excel("crypto_mfi_analysis.xlsx", index=False)
+    df.to_csv("out/crypto_mfi_analysis.csv", index=False)
+    df.to_excel("out/crypto_mfi_analysis.xlsx", index=False)
 
     # Select top 10 assets based on highest real_time_sum_change
     top_assets = df.nlargest(10, 'real_time_sum_change')
