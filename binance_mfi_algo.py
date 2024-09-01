@@ -9,7 +9,7 @@ import talib as ta
 import numpy as np
 import requests
 import sys
-from functions import load_config, setup_logging, get_candles, calculate_mfi, find_extrema, real_time_extrema, plot_asset, MFI_THRESHOLD_LOW, MFI_THRESHOLD_HIGH, MFI_STEP_THRESHOLD, MFI_TIMEINTERVAL
+from functions import load_config, setup_logging, get_candles, calculate_mfi, find_extrema, real_time_extrema, plot_asset, MFI_THRESHOLD_LOW, MFI_THRESHOLD_HIGH, MFI_STEP_THRESHOLD, MFI_TIMEINTERVAL, MFI_TRADING_TIMEOUT_H
 
 def execute_trade(symbol, quantity, action, config_path, dry_run):
     config = load_config(config_path)
@@ -28,8 +28,13 @@ def execute_trade(symbol, quantity, action, config_path, dry_run):
     
     client.close_connection()
 
+    final_price = np.mean([float(fill['price']) for fill in order['fills']])
+
+    return {'price': final_price}
+
 def main(symbol, quantity, config_path, dry_run, negative_cancel_num=4): 
     start_time = datetime.now()
+    start_time_str = datetime.now().strftime('%Y_%m_%d_%H_%M_%S')
     
     # Load initial candles and MFI
     candles = get_candles(symbol, "1m", "1440")
@@ -60,7 +65,7 @@ def main(symbol, quantity, config_path, dry_run, negative_cancel_num=4):
             "mfi": mfi,
             "buy_signals": buy_signals,
             "sell_signals": sell_signals
-        }, "_trading")
+        }, f"_trading_{start_time_str}")
 
         # We have to account for the case when we get >1 new candle
         mfi_new_from = len(mfi) - len(really_new_candles)
@@ -125,6 +130,7 @@ def main(symbol, quantity, config_path, dry_run, negative_cancel_num=4):
         # Get next candle and add it
         # get several candles just to be sure we didn't miss any due to some glitch
         url = f"https://api.binance.com/api/v3/klines?symbol={symbol}&interval=1m&limit=10"
+        # TODO: can get TimeoutError: [Errno 60] Operation timed out
         response = requests.get(url)
         new_candles = response.json()
         all_current_timestamps = [candle[0] for candle in candles]
@@ -140,9 +146,9 @@ def main(symbol, quantity, config_path, dry_run, negative_cancel_num=4):
             logging.info(f"Negative profit in last {negative_cancel_num} iterations. Exiting.")
             break
 
-        # Check elapsed time
-        if datetime.now() - start_time > timedelta(hours=24):
-            logging.info("Running time exceeded 24 hours. Exiting.")
+        # Check elapsed time - but finished only after trade was closed
+        if not bought and (datetime.now() - start_time > timedelta(hours=MFI_TRADING_TIMEOUT_H)):
+            logging.info(f"Running time exceeded {MFI_TRADING_TIMEOUT_H} hours. Exiting.")
             break
 
     logging.info(f"Finished. Total profit: {total_profit}")
@@ -151,7 +157,8 @@ if __name__ == "__main__":
     parser = argparse.ArgumentParser(description="")
     parser.add_argument("--config", required=True, help="Path to the YAML config file containing API keys")
     parser.add_argument("--symbol", required=True, help="Symbol, e.g. BTCUSDT")
-    parser.add_argument("--quantity", required=True, help="Quantity to operate with")
+    parser.add_argument("--quantity", required=False, help="Quantity to operate with")
+    parser.add_argument("--usdt_amount", required=False, help="USDT amount to operate with. Will be translated into corresponding asset's quantity")
     parser.add_argument("--dry-run", action="store_true")
 
     args = parser.parse_args()
@@ -161,4 +168,19 @@ if __name__ == "__main__":
     logging.info(f"Script called with: {' '.join(sys.argv)}")
     logging.info(str(args))
 
-    main(args.symbol, float(args.quantity), args.config, args.dry_run)
+    if args.quantity is None and args.usdt_amount is None:
+        logging.error("Either quantity or usdt_amount have to be specified")
+        exit(1)
+
+    if args.usdt_amount is not None:
+        client = Client()
+        ticker = client.get_symbol_ticker(symbol=args.symbol)
+        current_price = float(ticker['price'])
+        client.close_connection()
+        quantity = round(float(args.usdt_amount) / current_price)
+        logging.info(f"Chosen quantity is: {quantity}, equivalent to {current_price * quantity} USDT")
+
+    if args.quantity is not None:
+        quantity = float(args.quantity)
+
+    main(args.symbol, quantity, args.config, args.dry_run)

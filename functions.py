@@ -11,10 +11,11 @@ import matplotlib.pyplot as plt
 import mplfinance as mpf
 import yaml
 
-MFI_THRESHOLD_LOW = 25
-MFI_THRESHOLD_HIGH = 75
-MFI_STEP_THRESHOLD = 3
+MFI_THRESHOLD_LOW = 20
+MFI_THRESHOLD_HIGH = 80
+MFI_STEP_THRESHOLD = 2
 MFI_TIMEINTERVAL = 14
+MFI_TRADING_TIMEOUT_H = 12
 
 def load_config(config_file):
     with open(config_file, 'r') as file:

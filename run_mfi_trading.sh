@@ -25,3 +25,23 @@ python binance_mfi_algo.py --config keys.yaml \
     --symbol AKROUSDT \
     --quantity 10000 \
     --dry-run &
+
+
+python binance_mfi_algo.py --config keys.yaml \
+    --symbol FLUXUSDT \
+    --quantity 100 \
+    --dry-run &
+
+
+python binance_mfi_algo.py --config keys.yaml \
+    --symbol HARDUSDT \
+    --quantity 75
+
+python binance_mfi_algo.py --config keys.yaml \
+    --symbol QKCUSDT \
+    --quantity 1000
+
+
+python binance_mfi_algo.py --config keys.yaml \
+    --symbol HARDUSDT \
+    --usdt_amount 10
