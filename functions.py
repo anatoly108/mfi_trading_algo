@@ -66,7 +66,7 @@ def real_time_extrema(mfi):
     sell_signals = []
 
     last_local_minima = 100
-    last_local_maxima = 0
+    candles_above_threshold = 0
 
     bought = False
     
@@ -86,13 +86,15 @@ def real_time_extrema(mfi):
         if not bought:
             continue
 
-        # maxima
-        if mfi_i > MFI_THRESHOLD_HIGH and mfi_i > last_local_maxima:
-            last_local_maxima = mfi_i
+        if mfi_i > MFI_THRESHOLD_HIGH:
+            candles_above_threshold += 1
+        else:
+            candles_above_threshold = 0
 
-        diff_to_maxima = last_local_maxima - mfi_i
-        if mfi_i > MFI_THRESHOLD_HIGH and mfi_i < last_local_maxima and diff_to_maxima > MFI_STEP_THRESHOLD:
-            last_local_maxima = 0
+        # maxima
+        if candles_above_threshold > 1:
+            # sell as soon as MFI stays above threshold for 2 candles
+            candles_above_threshold = 0
             bought = False
             sell_signals.append(i) # sell signal
 

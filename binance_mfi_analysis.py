@@ -57,7 +57,7 @@ def main():
     ]
     
     results = []
-    for symbol in tqdm(symbols):  # Limiting to first 10 for testing
+    for symbol in tqdm(symbols):
         result = analyze_pair(symbol)
         if result:
             results.append(result)

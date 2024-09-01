@@ -41,7 +41,7 @@ def main(symbol, quantity, config_path, dry_run, negative_cancel_num=4):
     mfi = calculate_mfi(candles, MFI_TIMEINTERVAL)
 
     last_local_minima = 100
-    last_local_maxima = 0
+    candles_above_threshold = 0
     bought = False
     really_new_candles = []
     total_profit = 0
@@ -73,6 +73,7 @@ def main(symbol, quantity, config_path, dry_run, negative_cancel_num=4):
         # if len(really_new_candles) == 0, then this for loop won't even start
         for i in range(mfi_new_from, mfi_new_to):
             mfi_i = mfi[i]
+            logging.info(f"Current MFI value: {mfi_i}")
         
             # minima
             if mfi_i < MFI_THRESHOLD_LOW and mfi_i < last_local_minima:
@@ -93,16 +94,18 @@ def main(symbol, quantity, config_path, dry_run, negative_cancel_num=4):
                 break # this will break only from the mfi for loop - we can't sell inside this for loop because we would sell for the same price
 
             if not bought:
-                logging.info(f"Not bought, new MFI value: {mfi_i}")
+                logging.info(f"Not bought")
                 continue
 
             # maxima
-            if mfi_i > MFI_THRESHOLD_HIGH and mfi_i > last_local_maxima:
-                last_local_maxima = mfi_i
+            if mfi_i > MFI_THRESHOLD_HIGH:
+                candles_above_threshold += 1
+            else:
+                candles_above_threshold = 0
 
-            diff_to_maxima = last_local_maxima - mfi_i
-            if mfi_i > MFI_THRESHOLD_HIGH and mfi_i < last_local_maxima and diff_to_maxima > MFI_STEP_THRESHOLD:
-                last_local_maxima = 0
+            if candles_above_threshold >= 2:
+                # sell as soon as MFI stays above threshold for 2 candles
+                candles_above_threshold = 0
                 bought = False
                 # sell signal
                 order = execute_trade(symbol, quantity, "sell", config_path, dry_run)
@@ -125,7 +128,7 @@ def main(symbol, quantity, config_path, dry_run, negative_cancel_num=4):
                 logging.info(f"Total profit: {total_profit} USDT")
 
         # Sleep for 60 seconds before fetching new data
-        logging.info("Waiting for the next candle")
+        logging.info(f"Waiting for the next candle, current candles above threshold: {candles_above_threshold}")
         time.sleep(60)
         # Get next candle and add it
         # get several candles just to be sure we didn't miss any due to some glitch

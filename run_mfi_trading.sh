@@ -43,5 +43,5 @@ python binance_mfi_algo.py --config keys.yaml \
 
 
 python binance_mfi_algo.py --config keys.yaml \
-    --symbol HARDUSDT \
+    --symbol FIOUSDT \
     --usdt_amount 10
