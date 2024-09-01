@@ -49,11 +49,17 @@ def main(symbol, quantity, config_path, dry_run, negative_cancel_num=4):
     sell_signals = []
     profits = []
 
+    # initialize last_local_minima - for the case when there's a buy opportunity immediately at start
     for i in range(1, len(mfi)):
         mfi_i = mfi[i]
         
         # minima
+        if mfi_i > MFI_THRESHOLD_LOW:
+            # if last candle is above threshold, last_local_minima is reset
+            last_local_minima = 100
+
         if mfi_i < MFI_THRESHOLD_LOW and mfi_i < last_local_minima:
+            # if last candle is below threshold, last_local_minima is set accordingly
             last_local_minima = mfi_i
     
     while True:
@@ -74,10 +80,12 @@ def main(symbol, quantity, config_path, dry_run, negative_cancel_num=4):
         for i in range(mfi_new_from, mfi_new_to):
             mfi_i = mfi[i]
             logging.info(f"Current MFI value: {mfi_i}")
+            logging.info(f"Current local minima: {last_local_minima}")
         
             # minima
             if mfi_i < MFI_THRESHOLD_LOW and mfi_i < last_local_minima:
                 last_local_minima = mfi_i
+                logging.info(f"New local minima: {last_local_minima}")
 
             diff_to_minima = mfi_i - last_local_minima 
             if mfi_i < MFI_THRESHOLD_LOW and mfi_i > last_local_minima and diff_to_minima > MFI_STEP_THRESHOLD and not bought:
