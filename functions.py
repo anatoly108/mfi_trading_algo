@@ -13,7 +13,7 @@ import yaml
 
 MFI_THRESHOLD_LOW = 20
 MFI_THRESHOLD_HIGH = 80
-MFI_STEP_THRESHOLD = 2
+MFI_STEP_THRESHOLD = 3
 MFI_TIMEINTERVAL = 14
 MFI_TRADING_TIMEOUT_H = 12
 
@@ -73,12 +73,15 @@ def real_time_extrema(mfi):
     for i in range(1, len(mfi)):
         mfi_i = mfi[i]
         
+        if mfi_i > MFI_THRESHOLD_LOW:
+            last_local_minima = 100
+
         # minima
         if mfi_i < MFI_THRESHOLD_LOW and mfi_i < last_local_minima:
             last_local_minima = mfi_i
 
         diff_to_minima = mfi_i - last_local_minima 
-        if mfi_i < MFI_THRESHOLD_LOW and mfi_i > last_local_minima and diff_to_minima > MFI_STEP_THRESHOLD and not bought:
+        if mfi_i < (MFI_THRESHOLD_LOW + 10) and mfi_i > last_local_minima and diff_to_minima > MFI_STEP_THRESHOLD and not bought:
             last_local_minima = 100
             bought = True
             buy_signals.append(i) # buy signal

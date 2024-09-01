@@ -83,12 +83,15 @@ def main(symbol, quantity, config_path, dry_run, negative_cancel_num=4):
             logging.info(f"Current local minima: {last_local_minima}")
         
             # minima
+            if mfi_i > MFI_THRESHOLD_LOW:
+                last_local_minima = 100
+
             if mfi_i < MFI_THRESHOLD_LOW and mfi_i < last_local_minima:
                 last_local_minima = mfi_i
                 logging.info(f"New local minima: {last_local_minima}")
 
             diff_to_minima = mfi_i - last_local_minima 
-            if mfi_i < MFI_THRESHOLD_LOW and mfi_i > last_local_minima and diff_to_minima > MFI_STEP_THRESHOLD and not bought:
+            if mfi_i < (MFI_THRESHOLD_LOW + 10) and mfi_i > last_local_minima and diff_to_minima > MFI_STEP_THRESHOLD and not bought:
                 last_local_minima = 100
                 bought = True
                 # buy signal
