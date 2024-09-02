@@ -45,3 +45,19 @@ python binance_mfi_algo.py --config keys.yaml \
 python binance_mfi_algo.py --config keys.yaml \
     --symbol FIOUSDT \
     --usdt_amount 10
+
+python binance_mfi_algo.py --config keys.yaml \
+    --symbol CYBERUSDT \
+    --usdt_amount 10
+
+python binance_mfi_algo.py --config keys.yaml \
+    --symbol BURGERUSDT \
+    --usdt_amount 10
+
+python binance_mfi_algo.py --config keys.yaml \
+    --symbol OOKIUSDT \
+    --usdt_amount 10
+
+python binance_mfi_algo.py --config keys.yaml \
+    --symbol PHAUSDT \
+    --usdt_amount 10
