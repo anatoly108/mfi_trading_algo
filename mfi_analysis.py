@@ -7,7 +7,7 @@ from datetime import datetime, timedelta
 from tqdm import tqdm
 from binance.client import Client
 from scipy.signal import find_peaks
-from functions import load_config, setup_logging, get_1m_candles, calculate_mfi, find_extrema, real_time_extrema, plot_asset, get_candles, MFI_TIMEINTERVAL
+from mfi_functions import load_config, setup_logging, get_1m_candles, calculate_mfi, find_extrema, real_time_extrema, plot_asset, get_candles, MFI_TIMEINTERVAL
 
 def calculate_price_change(candles, minima, maxima):
     changes = []
