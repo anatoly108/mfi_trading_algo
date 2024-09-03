@@ -52,26 +52,28 @@ def convert_to_unix(date_obj):
 def get_last_complete_time(interval):
     now = datetime.now(timezone.utc)
     
-    if interval.endswith('m'):  # Minutes intervals
+    if interval.endswith('m'):  # Minute intervals
         minutes = int(interval[:-1])
-        last_complete_time = now - timedelta(minutes=now.minute % minutes, seconds=now.second, microseconds=now.microsecond)
+        last_complete_time = now.replace(second=0, microsecond=0) - timedelta(minutes=now.minute % minutes + minutes)
     
-    elif interval.endswith('h'):  # Hours intervals
+    elif interval.endswith('h'):  # Hour intervals
         hours = int(interval[:-1])
-        last_complete_time = now.replace(minute=0, second=0, microsecond=0) - timedelta(hours=now.hour % hours)
+        last_complete_time = now.replace(minute=0, second=0, microsecond=0) - timedelta(hours=now.hour % hours + hours)
     
     elif interval == '1d':  # 1 day interval
-        last_complete_time = now.replace(hour=0, minute=0, second=0, microsecond=0)
+        last_complete_time = now.replace(hour=0, minute=0, second=0, microsecond=0) - timedelta(days=1)
     
     elif interval == '3d':  # 3 days interval
-        last_complete_time = now.replace(hour=0, minute=0, second=0, microsecond=0) - timedelta(days=(now.day - 1) % 3)
+        last_complete_time = now.replace(hour=0, minute=0, second=0, microsecond=0) - timedelta(days=(now.day - 1) % 3 + 3)
     
     elif interval == '1w':  # 1 week interval
         days_since_monday = now.weekday()
-        last_complete_time = now.replace(hour=0, minute=0, second=0, microsecond=0) - timedelta(days=days_since_monday)
+        last_complete_time = now.replace(hour=0, minute=0, second=0, microsecond=0) - timedelta(days=days_since_monday + 7)
     
     elif interval == '1M':  # 1 month interval
-        last_complete_time = now.replace(day=1, hour=0, minute=0, second=0, microsecond=0)
+        first_day_of_current_month = now.replace(day=1, hour=0, minute=0, second=0, microsecond=0)
+        last_complete_time = first_day_of_current_month - timedelta(days=first_day_of_current_month.day)
+        last_complete_time = last_complete_time.replace(day=1)
     
     else:
         raise ValueError("Unsupported interval")
