@@ -43,6 +43,9 @@ def setup_logging(file_suffix=""):
         ]
     )
 
+def usd_to_quantity(usdt_amount, current_price):
+    return(round(usdt_amount / current_price))
+
 def convert_to_unix(date_obj):
     return int(date_obj.timestamp() * 1000)
 
@@ -75,6 +78,7 @@ def get_last_complete_time(interval):
     
     return last_complete_time
 
+# note: this will return only complete candles!
 # startTime and endTime are datetime objects, easiest way to specify: datetime.strptime("2024-01-01 00:00:00", "%Y-%m-%d %H:%M:%S")
 def get_candles(symbol, interval, startTime=None, endTime=None):
     url = "https://api.binance.com/api/v3/klines"
@@ -93,13 +97,11 @@ def get_candles(symbol, interval, startTime=None, endTime=None):
         params["endTime"] = endTimeUnix
     # TODO: can get TimeoutError: [Errno 60] Operation timed out
     response = requests.get(url, params=params)
-    return response.json()
+    candles = response.json()
+    # to be 100% sure candles are sorted correctly by timestamp
+    candles = sorted(candles, key=lambda x: x[0])
 
-def get_1m_candles(symbol):
-    get_candles(symbol, "1m", "1440")
-    url = f"https://api.binance.com/api/v3/klines?symbol={symbol}&interval=1m&limit=1440" # 24h
-    response = requests.get(url)
-    return response.json()
+    return candles
 
 def calculate_mfi(candles, timeperiod=14):
     high = np.array([float(c[2]) for c in candles])
@@ -112,48 +114,6 @@ def find_extrema(data):
     peaks, _ = find_peaks(data, distance=30)
     troughs, _ = find_peaks(-data, distance=30)
     return troughs, peaks
-
-def real_time_extrema(mfi):
-    buy_signals = []
-    sell_signals = []
-
-    last_local_minima = 100
-    candles_above_threshold = 0
-
-    bought = False
-    
-    for i in range(1, len(mfi)):
-        mfi_i = mfi[i]
-        
-        if mfi_i > MFI_THRESHOLD_LOW:
-            last_local_minima = 100
-
-        # minima
-        if mfi_i < MFI_THRESHOLD_LOW and mfi_i < last_local_minima:
-            last_local_minima = mfi_i
-
-        diff_to_minima = mfi_i - last_local_minima 
-        if mfi_i < (MFI_THRESHOLD_LOW + 10) and mfi_i > last_local_minima and diff_to_minima > MFI_STEP_THRESHOLD and not bought:
-            last_local_minima = 100
-            bought = True
-            buy_signals.append(i) # buy signal
-        
-        if not bought:
-            continue
-
-        if mfi_i > MFI_THRESHOLD_HIGH:
-            candles_above_threshold += 1
-        else:
-            candles_above_threshold = 0
-
-        # maxima
-        if candles_above_threshold > 1:
-            # sell as soon as MFI stays above threshold for 2 candles
-            candles_above_threshold = 0
-            bought = False
-            sell_signals.append(i) # sell signal
-
-    return buy_signals, sell_signals
 
 
 def plot_asset(asset_data, plot_suffix=""):
@@ -225,12 +185,14 @@ def get_new_candles_binance_api(symbol, interval, last_candle_timestamp):
 
 def run_mfi_trading_algo(symbol, quantity, config_path, dry_run, 
                          negative_cancel_num=3, get_new_candles_function=get_new_candles_binance_api,
-                         candles_start_time=None, candles_end_time=None): 
+                         candles = None): 
     start_time = datetime.now()
     start_time_str = datetime.now().strftime('%Y_%m_%d_%H_%M_%S')
     
     # Load initial candles and MFI
-    candles = get_candles(symbol, "1m", candles_start_time, candles_end_time)
+    if candles is None:
+        candles = get_candles(symbol, "1m")
+
     mfi = calculate_mfi(candles, MFI_TIMEINTERVAL)
 
     last_local_minima = 100

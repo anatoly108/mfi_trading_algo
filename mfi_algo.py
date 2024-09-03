@@ -9,10 +9,7 @@ import talib as ta
 import numpy as np
 import requests
 import sys
-from mfi_functions import load_config, setup_logging, get_candles, calculate_mfi, \
-    find_extrema, real_time_extrema, plot_asset, \
-    MFI_THRESHOLD_LOW, MFI_THRESHOLD_HIGH, MFI_STEP_THRESHOLD, MFI_TIMEINTERVAL, MFI_TRADING_TIMEOUT_H, MFI_THRESHOLD_LOW_EXTENDED, \
-    MFI_THRESHOLD_DECREASE_PER_CANDLE, get_last_complete_time, MFI_THRESHOLD_HIGH_MIN
+from mfi_functions import setup_logging, run_mfi_trading_algo, usd_to_quantity
 
 if __name__ == "__main__":
     parser = argparse.ArgumentParser(description="")
@@ -38,7 +35,7 @@ if __name__ == "__main__":
         ticker = client.get_symbol_ticker(symbol=args.symbol)
         current_price = float(ticker['price'])
         client.close_connection()
-        quantity = round(float(args.usdt_amount) / current_price)
+        quantity = usd_to_quantity(float(args.usdt_amount), current_price)
         logging.info(f"Chosen quantity is: {quantity}, equivalent to {current_price * quantity} USDT")
 
     if args.quantity is not None:
