@@ -235,7 +235,7 @@ def get_new_candles_binance_api(symbol, interval, last_candle_timestamp):
     # Sleep for 60 seconds before fetching new data
     time.sleep(60)
     # get many candles just to be sure we didn't miss any due to some glitch
-    return(get_candles(symbol, "1m", datetime.fromtimestamp(last_candle_timestamp/1000) - timedelta(minutes=10), get_last_complete_time_for_candles()))
+    return(get_candles(symbol, "1m", datetime.fromtimestamp(last_candle_timestamp/1000) - timedelta(minutes=10), get_last_complete_time_for_candles(interval)))
 
 def run_mfi_trading_algo(symbol, quantity, config_path, dry_run, 
                          negative_cancel_num=3, get_new_candles_function=get_new_candles_binance_api,
