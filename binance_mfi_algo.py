@@ -9,16 +9,18 @@ import talib as ta
 import numpy as np
 import requests
 import sys
-from functions import load_config, setup_logging, get_candles, calculate_mfi, find_extrema, real_time_extrema, plot_asset, MFI_THRESHOLD_LOW, MFI_THRESHOLD_HIGH, MFI_STEP_THRESHOLD, MFI_TIMEINTERVAL, MFI_TRADING_TIMEOUT_H
+from functions import load_config, setup_logging, get_candles, calculate_mfi, \
+    find_extrema, real_time_extrema, plot_asset, \
+    MFI_THRESHOLD_LOW, MFI_THRESHOLD_HIGH, MFI_STEP_THRESHOLD, MFI_TIMEINTERVAL, MFI_TRADING_TIMEOUT_H, MFI_THRESHOLD_LOW_EXTENDED, \
+    MFI_THRESHOLD_DECREASE_PER_CANDLE, get_last_complete_time, MFI_THRESHOLD_HIGH_MIN
 
 def execute_trade(symbol, quantity, action, config_path, dry_run):
-    config = load_config(config_path)
-    client = Client(config['api_key'], config['api_secret'])
-    
     if dry_run:
         logging.info(f"Dry run {action}")
         return {'price': None}
 
+    config = load_config(config_path)
+    client = Client(config['api_key'], config['api_secret'])
     if action == 'buy':
         order = client.order_market_buy(symbol=symbol, quantity=quantity)
         logging.info(f"Market Buy Order: {order}")
@@ -32,12 +34,19 @@ def execute_trade(symbol, quantity, action, config_path, dry_run):
 
     return {'price': final_price}
 
-def main(symbol, quantity, config_path, dry_run, negative_cancel_num=4): 
+def get_new_candles_binance_api(symbol, interval, last_candle_timestamp):
+    # get many candles just to be sure we didn't miss any due to some glitch
+    # TODO: test it
+    return(get_candles(symbol, "1m", datetime.fromtimestamp(last_candle_timestamp/1000) - timedelta(minutes=10), get_last_complete_time()))
+
+def run_mfi_trading_algo(symbol, quantity, config_path, dry_run, 
+                         negative_cancel_num=3, get_new_candles_function=get_new_candles_binance_api,
+                         candles_start_time=None, candles_end_time=None): 
     start_time = datetime.now()
     start_time_str = datetime.now().strftime('%Y_%m_%d_%H_%M_%S')
     
     # Load initial candles and MFI
-    candles = get_candles(symbol, "1m", "1440")
+    candles = get_candles(symbol, "1m", candles_start_time, candles_end_time)
     mfi = calculate_mfi(candles, MFI_TIMEINTERVAL)
 
     last_local_minima = 100
@@ -48,6 +57,7 @@ def main(symbol, quantity, config_path, dry_run, negative_cancel_num=4):
     buy_signals = []
     sell_signals = []
     profits = []
+    candles_since_buy = 0
 
     # initialize last_local_minima - for the case when there's a buy opportunity immediately at start
     for i in range(1, len(mfi)):
@@ -87,13 +97,14 @@ def main(symbol, quantity, config_path, dry_run, negative_cancel_num=4):
                 last_local_minima = mfi_i
                 logging.info(f"New local minima: {last_local_minima}")
             
-            # TODO: check if this all is correct
             diff_to_minima = mfi_i - last_local_minima
-            if mfi_i > (MFI_THRESHOLD_LOW + 10):
-                # reset local minima only when mfi goes higher than low + 10
+            
+            # TODO: test if this is correct now
+            if mfi_i > MFI_THRESHOLD_LOW_EXTENDED:
+                # reset local minima only when mfi goes higher than extended threshold
                 last_local_minima = 100
             
-            if mfi_i < (MFI_THRESHOLD_LOW + 10) and diff_to_minima > MFI_STEP_THRESHOLD and not bought:
+            if mfi_i < MFI_THRESHOLD_LOW_EXTENDED and diff_to_minima > MFI_STEP_THRESHOLD and not bought:
                 last_local_minima = 100
                 bought = True
                 # buy signal
@@ -111,7 +122,14 @@ def main(symbol, quantity, config_path, dry_run, negative_cancel_num=4):
                 continue
 
             # maxima
-            if mfi_i > MFI_THRESHOLD_HIGH:
+            current_mfi_threshold_high = MFI_THRESHOLD_HIGH - candles_since_buy * MFI_THRESHOLD_DECREASE_PER_CANDLE
+            if current_mfi_threshold_high < MFI_THRESHOLD_HIGH_MIN:
+                logging.info(f"MFI threshold reached minimum of {MFI_THRESHOLD_HIGH_MIN}")
+                current_mfi_threshold_high = MFI_THRESHOLD_HIGH_MIN
+
+            logging.info(f"Waiting for sell signal, candles_since_buy = {candles_since_buy}, current_mfi_threshold_high = {current_mfi_threshold_high}")
+
+            if mfi_i > current_mfi_threshold_high:
                 candles_above_threshold += 1
             else:
                 candles_above_threshold = 0
@@ -119,6 +137,7 @@ def main(symbol, quantity, config_path, dry_run, negative_cancel_num=4):
             if candles_above_threshold >= 2:
                 # sell as soon as MFI stays above threshold for 2 candles
                 candles_above_threshold = 0
+                candles_since_buy = 0
                 bought = False
                 # sell signal
                 order = execute_trade(symbol, quantity, "sell", config_path, dry_run)
@@ -139,16 +158,15 @@ def main(symbol, quantity, config_path, dry_run, negative_cancel_num=4):
                 profits.append(profit)
                 logging.info(f"Current trade profit: {profit} USDT")
                 logging.info(f"Total profit: {total_profit} USDT")
+            else:
+                candles_since_buy += 1 # bought, but not sold; we'll lower the MFI threshold every candle
 
         # Sleep for 60 seconds before fetching new data
         logging.info(f"Waiting for the next candle, current candles above threshold: {candles_above_threshold}")
         time.sleep(60)
+        
         # Get next candle and add it
-        # get several candles just to be sure we didn't miss any due to some glitch
-        url = f"https://api.binance.com/api/v3/klines?symbol={symbol}&interval=1m&limit=10"
-        # TODO: can get TimeoutError: [Errno 60] Operation timed out
-        response = requests.get(url)
-        new_candles = response.json()
+        new_candles = get_new_candles_function(symbol, "1m", candles[-1][0])
         all_current_timestamps = [candle[0] for candle in candles]
         really_new_candles = [candle for candle in new_candles if candle[0] not in all_current_timestamps]
         if len(really_new_candles) == 0:
@@ -168,6 +186,16 @@ def main(symbol, quantity, config_path, dry_run, negative_cancel_num=4):
             break
 
     logging.info(f"Finished. Total profit: {total_profit}")
+
+    return({
+            "symbol": symbol,
+            "candles": candles,
+            "mfi": mfi,
+            "buy_signals": buy_signals,
+            "sell_signals": sell_signals,
+            "total_profit": total_profit,
+            "profits": profits
+        })
 
 if __name__ == "__main__":
     parser = argparse.ArgumentParser(description="")
@@ -199,4 +227,4 @@ if __name__ == "__main__":
     if args.quantity is not None:
         quantity = float(args.quantity)
 
-    main(args.symbol, quantity, args.config, args.dry_run)
+    run_mfi_trading_algo(args.symbol, quantity, args.config, args.dry_run)

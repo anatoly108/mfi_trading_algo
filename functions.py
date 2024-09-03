@@ -3,7 +3,7 @@ import numpy as np
 import talib as ta
 import requests
 import logging
-from datetime import datetime, timedelta
+from datetime import datetime, timedelta, timezone
 from binance.client import Client
 from scipy.signal import find_peaks
 import os
@@ -12,7 +12,12 @@ import mplfinance as mpf
 import yaml
 
 MFI_THRESHOLD_LOW = 20
+MFI_THRESHOLD_LOW_EXTENDED = MFI_THRESHOLD_LOW + 10
+
 MFI_THRESHOLD_HIGH = 80
+MFI_THRESHOLD_DECREASE_PER_CANDLE = 2
+MFI_THRESHOLD_HIGH_MIN = 50
+
 MFI_STEP_THRESHOLD = 3
 MFI_TIMEINTERVAL = 14
 MFI_TRADING_TIMEOUT_H = 12
@@ -38,9 +43,56 @@ def setup_logging(file_suffix=""):
         ]
     )
 
-def get_candles(symbol, interval, limit):
-    url = f"https://api.binance.com/api/v3/klines?symbol={symbol}&interval={interval}&limit={limit}"
-    response = requests.get(url)
+def convert_to_unix(date_obj):
+    return int(date_obj.timestamp() * 1000)
+
+def get_last_complete_time(interval):
+    now = datetime.now(timezone.utc)
+    
+    if interval.endswith('m'):  # Minutes intervals
+        minutes = int(interval[:-1])
+        last_complete_time = now - timedelta(minutes=now.minute % minutes, seconds=now.second, microseconds=now.microsecond)
+    
+    elif interval.endswith('h'):  # Hours intervals
+        hours = int(interval[:-1])
+        last_complete_time = now.replace(minute=0, second=0, microsecond=0) - timedelta(hours=now.hour % hours)
+    
+    elif interval == '1d':  # 1 day interval
+        last_complete_time = now.replace(hour=0, minute=0, second=0, microsecond=0)
+    
+    elif interval == '3d':  # 3 days interval
+        last_complete_time = now.replace(hour=0, minute=0, second=0, microsecond=0) - timedelta(days=(now.day - 1) % 3)
+    
+    elif interval == '1w':  # 1 week interval
+        days_since_monday = now.weekday()
+        last_complete_time = now.replace(hour=0, minute=0, second=0, microsecond=0) - timedelta(days=days_since_monday)
+    
+    elif interval == '1M':  # 1 month interval
+        last_complete_time = now.replace(day=1, hour=0, minute=0, second=0, microsecond=0)
+    
+    else:
+        raise ValueError("Unsupported interval")
+    
+    return last_complete_time
+
+# startTime and endTime are datetime objects, easiest way to specify: datetime.strptime("2024-01-01 00:00:00", "%Y-%m-%d %H:%M:%S")
+def get_candles(symbol, interval, startTime=None, endTime=None):
+    url = "https://api.binance.com/api/v3/klines"
+    params = {
+        "symbol": symbol,
+        "interval": interval
+    }
+    if startTime is None and endTime is None:
+        now = get_last_complete_time(interval)
+        params["startTime"] = convert_to_unix(now - timedelta(hours=24))
+        params["endTime"] = convert_to_unix(now)
+    else:
+        startTimeUnix = convert_to_unix(startTime.replace(tzinfo=timezone.utc))
+        endTimeUnix = convert_to_unix(endTime.replace(tzinfo=timezone.utc))
+        params["startTime"] = startTimeUnix
+        params["endTime"] = endTimeUnix
+    # TODO: can get TimeoutError: [Errno 60] Operation timed out
+    response = requests.get(url, params=params)
     return response.json()
 
 def get_1m_candles(symbol):
