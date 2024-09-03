@@ -49,61 +49,110 @@ def usd_to_quantity(usdt_amount, current_price):
 def convert_to_unix(date_obj):
     return int(date_obj.timestamp() * 1000)
 
-def get_last_complete_time(interval):
+def get_last_complete_time_for_candles(interval):
     now = datetime.now(timezone.utc)
     
     if interval.endswith('m'):  # Minute intervals
         minutes = int(interval[:-1])
-        last_complete_time = now.replace(second=0, microsecond=0) - timedelta(minutes=now.minute % minutes + minutes)
+        last_complete_time = now.replace(second=0, microsecond=0) - timedelta(minutes=now.minute % minutes)
     
     elif interval.endswith('h'):  # Hour intervals
+        print("warning: untested interval")
         hours = int(interval[:-1])
-        last_complete_time = now.replace(minute=0, second=0, microsecond=0) - timedelta(hours=now.hour % hours + hours)
+        last_complete_time = now.replace(minute=0, second=0, microsecond=0) - timedelta(hours=now.hour % hours)
     
     elif interval == '1d':  # 1 day interval
+        print("warning: untested interval")
         last_complete_time = now.replace(hour=0, minute=0, second=0, microsecond=0) - timedelta(days=1)
     
     elif interval == '3d':  # 3 days interval
-        last_complete_time = now.replace(hour=0, minute=0, second=0, microsecond=0) - timedelta(days=(now.day - 1) % 3 + 3)
+        print("warning: untested interval")
+        last_complete_time = now.replace(hour=0, minute=0, second=0, microsecond=0) - timedelta(days=(now.day - 1) % 3)
     
     elif interval == '1w':  # 1 week interval
+        print("warning: untested interval")
         days_since_monday = now.weekday()
-        last_complete_time = now.replace(hour=0, minute=0, second=0, microsecond=0) - timedelta(days=days_since_monday + 7)
+        last_complete_time = now.replace(hour=0, minute=0, second=0, microsecond=0) - timedelta(days=days_since_monday)
     
     elif interval == '1M':  # 1 month interval
-        first_day_of_current_month = now.replace(day=1, hour=0, minute=0, second=0, microsecond=0)
-        last_complete_time = first_day_of_current_month - timedelta(days=first_day_of_current_month.day)
-        last_complete_time = last_complete_time.replace(day=1)
-    
+        raise ValueError("Unsupported interval")
     else:
         raise ValueError("Unsupported interval")
     
     return last_complete_time
 
+def calculate_num_candles(interval, startTime, endTime):
+    interval_seconds = 0
+    if interval.endswith('m'):  # Minute intervals
+        interval_seconds = int(interval[:-1]) * 60
+    elif interval.endswith('h'):  # Hour intervals
+        interval_seconds = int(interval[:-1]) * 3600
+    elif interval == '1d':  # 1 day interval
+        interval_seconds = 86400
+    elif interval == '3d':  # 3 days interval
+        interval_seconds = 86400 * 3
+    elif interval == '1w':  # 1 week interval
+        interval_seconds = 86400 * 7
+    elif interval == '1M':  # 1 month interval
+        # This is more complex since months vary in length, but you can use an average or approximate value.
+        # Here's an average month length in seconds:
+        interval_seconds = 86400 * 30.44
+    else:
+        raise ValueError("Unsupported interval")
+
+    total_seconds = (endTime - startTime).total_seconds()
+    num_candles = int(total_seconds // interval_seconds)
+    return num_candles
+
+
 # note: this will return only complete candles!
 # startTime and endTime are datetime objects, easiest way to specify: datetime.strptime("2024-01-01 00:00:00", "%Y-%m-%d %H:%M:%S")
 def get_candles(symbol, interval, startTime=None, endTime=None):
     url = "https://api.binance.com/api/v3/klines"
-    params = {
-        "symbol": symbol,
-        "interval": interval
-    }
-    if startTime is None and endTime is None:
-        now = get_last_complete_time(interval)
-        params["startTime"] = convert_to_unix(now - timedelta(hours=24))
-        params["endTime"] = convert_to_unix(now)
-    else:
-        startTimeUnix = convert_to_unix(startTime.replace(tzinfo=timezone.utc))
-        endTimeUnix = convert_to_unix(endTime.replace(tzinfo=timezone.utc))
-        params["startTime"] = startTimeUnix
-        params["endTime"] = endTimeUnix
-    # TODO: can get TimeoutError: [Errno 60] Operation timed out
-    response = requests.get(url, params=params)
-    candles = response.json()
-    # to be 100% sure candles are sorted correctly by timestamp
-    candles = sorted(candles, key=lambda x: x[0])
+    all_candles = []
+    limit = 1000  # Maximum allowed by Binance
 
-    return candles
+    if startTime is None and endTime is None:
+        now = get_last_complete_time_for_candles(interval)
+        startTime = now - timedelta(hours=24)
+        endTime = now
+
+    startTimeUnix = convert_to_unix(startTime.replace(tzinfo=timezone.utc))
+    endTimeUnix = convert_to_unix(endTime.replace(tzinfo=timezone.utc)) + 1
+
+    num_candles = calculate_num_candles(interval, startTime, endTime)
+
+    while len(all_candles) < num_candles:
+        current_limit = min(limit, num_candles - len(all_candles))
+        params = {
+            "symbol": symbol,
+            "interval": interval,
+            "startTime": startTimeUnix,
+            "endTime": endTimeUnix,
+            "limit": current_limit # Fetch only the remaining needed candles
+        }
+        
+        response = requests.get(url, params=params)
+        candles = response.json()
+
+        if not candles:
+            break
+        
+        all_candles.extend(candles)
+        
+        # Move startTime forward to the last candle's timestamp + 1ms to avoid overlapping
+        last_candle_time = candles[-1][0]
+        startTimeUnix = last_candle_time + 1
+        
+        # To break if all possible candles were returned
+        if len(candles) < limit:
+            break
+    
+    # Sort all candles by timestamp to ensure correct order
+    all_candles = sorted(all_candles, key=lambda x: x[0])
+    
+    return all_candles
+
 
 def calculate_mfi(candles, timeperiod=14):
     high = np.array([float(c[2]) for c in candles])
@@ -185,11 +234,11 @@ def get_new_candles_binance_api(symbol, interval, last_candle_timestamp):
     # Sleep for 60 seconds before fetching new data
     time.sleep(60)
     # get many candles just to be sure we didn't miss any due to some glitch
-    return(get_candles(symbol, "1m", datetime.fromtimestamp(last_candle_timestamp/1000) - timedelta(minutes=10), get_last_complete_time()))
+    return(get_candles(symbol, "1m", datetime.fromtimestamp(last_candle_timestamp/1000) - timedelta(minutes=10), get_last_complete_time_for_candles()))
 
 def run_mfi_trading_algo(symbol, quantity, config_path, dry_run, 
                          negative_cancel_num=3, get_new_candles_function=get_new_candles_binance_api,
-                         candles = None): 
+                         candles = None, exit_after_no_candle=False, do_plot=True): 
     start_time = datetime.now()
     start_time_str = datetime.now().strftime('%Y_%m_%d_%H_%M_%S')
     
@@ -208,6 +257,7 @@ def run_mfi_trading_algo(symbol, quantity, config_path, dry_run,
     sell_signals = []
     profits = []
     candles_since_buy = 0
+    iteration = 0
 
     # initialize last_local_minima - for the case when there's a buy opportunity immediately at start
     for i in range(1, len(mfi)):
@@ -223,6 +273,8 @@ def run_mfi_trading_algo(symbol, quantity, config_path, dry_run,
             last_local_minima = mfi_i
     
     while True:
+        iteration += 1
+
         # Recalculate MFI with the new candle(s)
         mfi = calculate_mfi(candles, MFI_TIMEINTERVAL)
 
@@ -303,13 +355,14 @@ def run_mfi_trading_algo(symbol, quantity, config_path, dry_run,
             else:
                 candles_since_buy += 1 # bought, but not sold; we'll lower the MFI threshold every candle
 
-        plot_asset({
-            "symbol": symbol,
-            "candles": candles,
-            "mfi": mfi,
-            "buy_signals": buy_signals,
-            "sell_signals": sell_signals
-        }, f"_trading_{start_time_str}")
+        if do_plot:
+            plot_asset({
+                "symbol": symbol,
+                "candles": candles,
+                "mfi": mfi,
+                "buy_signals": buy_signals,
+                "sell_signals": sell_signals
+            }, f"_trading_{start_time_str}")
 
         logging.info(f"Waiting for the next candle, current candles above threshold: {candles_above_threshold}")
         
@@ -317,12 +370,19 @@ def run_mfi_trading_algo(symbol, quantity, config_path, dry_run,
         new_candles = get_new_candles_function(symbol, "1m", candles[-1][0])
         all_current_timestamps = [candle[0] for candle in candles]
         really_new_candles = [candle for candle in new_candles if candle[0] not in all_current_timestamps]
+        # print(iteration)
+        # print(len(really_new_candles))
+        
+        if len(really_new_candles) == 0 and exit_after_no_candle:
+            logging.info(f"No new candles and exit_after_no_candle is True. Exiting") 
+            break
+
         if len(really_new_candles) == 0:
             # no new candles - can happen
             continue
         logging.info(f"Got {len(really_new_candles)} new candle(s)") 
         candles.extend(really_new_candles)
-        
+
         # Check last N profits
         if len(profits) >= negative_cancel_num and all(p < 0 for p in profits[-negative_cancel_num:]):
             logging.info(f"Negative profit in last {negative_cancel_num} iterations. Exiting.")
