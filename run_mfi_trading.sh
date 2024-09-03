@@ -58,6 +58,7 @@ python binance_mfi_algo.py --config keys.yaml \
     --symbol OOKIUSDT \
     --usdt_amount 10
 
-python binance_mfi_algo.py --config keys.yaml \
-    --symbol PHAUSDT \
-    --usdt_amount 10
+python mfi_algo.py --config keys.yaml \
+    --symbol VICUSDT \
+    --usdt_amount 100 \
+    --dry-run 

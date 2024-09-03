@@ -10,6 +10,7 @@ import os
 import matplotlib.pyplot as plt
 import mplfinance as mpf
 import yaml
+import time
 
 MFI_THRESHOLD_LOW = 20
 MFI_THRESHOLD_LOW_EXTENDED = MFI_THRESHOLD_LOW + 10

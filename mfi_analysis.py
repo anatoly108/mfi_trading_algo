@@ -102,6 +102,8 @@ def main():
         for symbol in exchange_info['symbols'] 
         if symbol['symbol'].endswith('USDT') and symbol['status'] == 'TRADING' and symbol['isSpotTradingAllowed']
     ]
+    # for testing specific symbols
+    # symbols = ["AUDIOUSDT"]
     
     results = []
     for symbol in tqdm(symbols):
@@ -129,11 +131,16 @@ def main():
 
     # Select top 10 assets based on highest real_time_sum_change
     top_assets = df[1:min([10, df.shape[0]])]
+    # flop_assets = df[-min([10, df.shape[0]]):]
     results_top = [res for res in results if res["symbol"] in list(top_assets["symbol"])]
+    # results_flop = [res for res in results if res["symbol"] in list(top_assets["symbol"])]
 
     # Plotting each of the top 10 assets
     for asset in results_top:
-        plot_asset(asset, "_analysis")
+        plot_asset(asset, "_analysis_top")
+
+    # for asset in flop_assets:
+    #     plot_asset(asset, "_analysis_flop")
 
 if __name__ == "__main__":
     main()
