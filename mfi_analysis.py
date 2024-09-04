@@ -74,16 +74,19 @@ def analyze_pair(symbol):
     fee_per_trade = 0.075 / 100 # 0.075% fee per trade on level 1
     total_profit_minus_fees = trading_results["total_profit"] - fee_per_trade*trades_num*usdt
 
+    asset_price_change = round((1 - candles[0][4]/candles[-1][4]) * 100, 1)
+
     result_dict = {
         "symbol": symbol,
         "candles": candles,
         "mfi": mfi,
         "buy_signals": buy_signals,
         "sell_signals": sell_signals,
-        "total_profit": trading_results["total_profit"],
-        "total_profit_minus_fees": total_profit_minus_fees,
+        "total_profit": round(trading_results["total_profit"], 1),
+        "total_profit_minus_fees": round(total_profit_minus_fees, 1),
         "trades_num": trades_num,
-        "pnl": (trading_results["total_profit"]/usdt)*100
+        "pnl": round((trading_results["total_profit"]/usdt)*100, 1),
+        "asset_price_change": asset_price_change
     }
 
     # Add all ticker data, but update only keys that are not present in 
@@ -121,7 +124,8 @@ def main():
         "total_profit_minus_fees": res["total_profit_minus_fees"],
         "trades_num": res["trades_num"],
         "pnl": res["pnl"],
-        "quoteVolume": convert_to_millions(float(res["quoteVolume"]))
+        "quoteVolume": convert_to_millions(float(res["quoteVolume"])),
+        "asset_price_change": res["asset_price_change"]
     }
         for res in results
     ]
