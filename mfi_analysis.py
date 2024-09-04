@@ -53,7 +53,8 @@ def analyze_pair(symbol):
         []
     )
 
-    quantity = usd_to_quantity(1000, float(candles[-1][4])) # latest close price to figure out quantity, assume $1k trades
+    usdt = 1000
+    quantity = usd_to_quantity(usdt, float(candles[-1][4])) # latest close price to figure out quantity, assume $1k trades
     trading_results = run_mfi_trading_algo(symbol = symbol, 
                                            quantity = quantity, 
                                            config_path = None, 
@@ -65,22 +66,24 @@ def analyze_pair(symbol):
     buy_signals = trading_results["buy_signals"]
     sell_signals = trading_results["sell_signals"]
     
-    optimal_changes = calculate_price_change(candles, troughs, peaks)
-    real_time_changes = calculate_price_change(candles, buy_signals, sell_signals)
-
     url = f"https://api.binance.com/api/v3/ticker/24hr?symbol={symbol}"
     response = requests.get(url)
     ticker_data = response.json()
 
+    trades_num = len(buy_signals) * 2
+    fee_per_trade = 0.075 / 100 # 0.075% fee per trade on level 1
+    total_profit_minus_fees = trading_results["total_profit"] - fee_per_trade*trades_num*usdt
+
     result_dict = {
         "symbol": symbol,
-        "optimal_sum_change": sum(optimal_changes),
-        "real_time_sum_change": sum(real_time_changes),
         "candles": candles,
         "mfi": mfi,
         "buy_signals": buy_signals,
         "sell_signals": sell_signals,
-        "total_profit": trading_results["total_profit"]
+        "total_profit": trading_results["total_profit"],
+        "total_profit_minus_fees": total_profit_minus_fees,
+        "trades_num": trades_num,
+        "pnl": (trading_results["total_profit"]/usdt)*100
     }
 
     # Add all ticker data, but update only keys that are not present in 
@@ -114,9 +117,10 @@ def main():
     subset_results = [
     {
         "symbol": res["symbol"],
-        "optimal_sum_change": res["optimal_sum_change"],
-        "real_time_sum_change": res["real_time_sum_change"],
         "total_profit": res["total_profit"],
+        "total_profit_minus_fees": res["total_profit_minus_fees"],
+        "trades_num": res["trades_num"],
+        "pnl": res["pnl"],
         "quoteVolume": convert_to_millions(float(res["quoteVolume"]))
     }
         for res in results
@@ -124,7 +128,7 @@ def main():
 
     # Create a DataFrame from the subset results
     df = pd.DataFrame(subset_results)
-    df = df.sort_values(by='real_time_sum_change', ascending=False)
+    df = df.sort_values(by='total_profit', ascending=False)
 
     out_directory_name = f"out/{datetime.now().strftime('%Y_%m_%d')}"
 
@@ -136,7 +140,7 @@ def main():
     df.to_csv(f"{out_directory_name}/{filename_suffix}_crypto_mfi_analysis.csv", index=False)
     df.to_excel(f"{out_directory_name}/{filename_suffix}_crypto_mfi_analysis.xlsx", index=False)
 
-    # Select top 10 assets based on highest real_time_sum_change
+    # Select top 10 assets based on highest total_profit
     top_assets = df[1:min([10, df.shape[0]])]
     flop_assets = df[-min([10, df.shape[0]]):]
     results_top = [res for res in results if res["symbol"] in list(top_assets["symbol"])]
