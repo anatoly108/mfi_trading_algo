@@ -125,22 +125,30 @@ def main():
     # Create a DataFrame from the subset results
     df = pd.DataFrame(subset_results)
     df = df.sort_values(by='real_time_sum_change', ascending=False)
+
+    out_directory_name = f"out/{datetime.now().strftime('%Y_%m_%d')}"
+
+    # Create the directory if it doesn't exist
+    if not os.path.exists(out_directory_name):
+        os.makedirs(out_directory_name)
+
     filename_suffix = datetime.now().strftime('%Y_%m_%d_%H_%M_%S')
-    df.to_csv(f"out/{filename_suffix}_crypto_mfi_analysis.csv", index=False)
-    df.to_excel(f"out/{filename_suffix}_crypto_mfi_analysis.xlsx", index=False)
+    df.to_csv(f"{out_directory_name}/{filename_suffix}_crypto_mfi_analysis.csv", index=False)
+    df.to_excel(f"{out_directory_name}/{filename_suffix}_crypto_mfi_analysis.xlsx", index=False)
 
     # Select top 10 assets based on highest real_time_sum_change
     top_assets = df[1:min([10, df.shape[0]])]
-    # flop_assets = df[-min([10, df.shape[0]]):]
+    flop_assets = df[-min([10, df.shape[0]]):]
     results_top = [res for res in results if res["symbol"] in list(top_assets["symbol"])]
-    # results_flop = [res for res in results if res["symbol"] in list(top_assets["symbol"])]
+    results_flop = [res for res in results if res["symbol"] in list(flop_assets["symbol"])]
 
     # Plotting each of the top 10 assets
     for asset in results_top:
-        plot_asset(asset, "_analysis_top")
+        plot_asset(asset, "_analysis_top", out_dir=out_directory_name)
 
-    # for asset in flop_assets:
-    #     plot_asset(asset, "_analysis_flop")
+    # Plotting each of the flop 10 assets
+    for asset in results_flop:
+        plot_asset(asset, "_analysis_flop", out_dir=out_directory_name)
 
 if __name__ == "__main__":
     main()

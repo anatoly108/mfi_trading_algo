@@ -168,7 +168,7 @@ def find_extrema(data):
     return troughs, peaks
 
 
-def plot_asset(asset_data, plot_suffix=""):
+def plot_asset(asset_data, plot_suffix="", out_dir="out"):
     symbol = asset_data["symbol"]
     candles = asset_data["candles"]
     mfi = asset_data["mfi"]
@@ -205,8 +205,11 @@ def plot_asset(asset_data, plot_suffix=""):
     ax1.legend()
     ax2.legend()
 
+    if not os.path.exists(out_dir):
+        os.makedirs(out_dir)
+
     plt.tight_layout()
-    plt.savefig(f'out/{symbol}_chart{plot_suffix}.png')
+    plt.savefig(f'{out_dir}/{symbol}_chart{plot_suffix}.png')
     # plt.show()
     plt.close()
 
@@ -235,11 +238,13 @@ def get_new_candles_binance_api(symbol, interval, last_candle_timestamp):
     # Sleep for 60 seconds before fetching new data
     time.sleep(60)
     # get many candles just to be sure we didn't miss any due to some glitch
-    return(get_candles(symbol, "1m", datetime.fromtimestamp(last_candle_timestamp/1000) - timedelta(minutes=10), get_last_complete_time_for_candles(interval)))
+    return(get_candles(symbol, "1m", 
+                       (datetime.fromtimestamp(last_candle_timestamp/1000) - timedelta(minutes=10)).replace(tzinfo=timezone.utc), 
+                       get_last_complete_time_for_candles(interval)))
 
 def run_mfi_trading_algo(symbol, quantity, config_path, dry_run, 
                          negative_cancel_num=3, get_new_candles_function=get_new_candles_binance_api,
-                         candles = None, exit_after_no_candle=False, do_plot=True): 
+                         candles = None, exit_after_no_candle=False, do_plot=True, out_dir="out"): 
     start_time = datetime.now()
     start_time_str = datetime.now().strftime('%Y_%m_%d_%H_%M_%S')
     
@@ -363,26 +368,32 @@ def run_mfi_trading_algo(symbol, quantity, config_path, dry_run,
                 "mfi": mfi,
                 "buy_signals": buy_signals,
                 "sell_signals": sell_signals
-            }, f"_trading_{start_time_str}")
+            }, f"_trading_{start_time_str}", out_dir=out_dir)
 
         logging.info(f"Waiting for the next candle, current candles above threshold: {candles_above_threshold}")
         
         # Get next candle and add it
-        new_candles = get_new_candles_function(symbol, "1m", candles[-1][0])
+        last_candle_timestamp = candles[-1][0]
+        last_candle_datetime_obj = datetime.fromtimestamp(last_candle_timestamp/1000).replace(tzinfo=timezone.utc)
+        logging.info(f"Last candle time before new candles, UNIX: {last_candle_timestamp}, UTC: {last_candle_datetime_obj}")
+        
+        new_candles = get_new_candles_function(symbol, "1m", last_candle_timestamp)
         all_current_timestamps = [candle[0] for candle in candles]
         really_new_candles = [candle for candle in new_candles if candle[0] not in all_current_timestamps]
-        # print(iteration)
-        # print(len(really_new_candles))
-        
+
+        logging.info(f"Got {len(really_new_candles)} new candle(s)")
         if len(really_new_candles) == 0 and exit_after_no_candle:
-            logging.info(f"No new candles and exit_after_no_candle is True. Exiting") 
+            logging.info(f"No new candles and exit_after_no_candle is True. Exiting.")
             break
 
         if len(really_new_candles) == 0:
             # no new candles - can happen
             continue
-        logging.info(f"Got {len(really_new_candles)} new candle(s)") 
+        
         candles.extend(really_new_candles)
+        last_candle_timestamp = candles[-1][0]
+        last_candle_datetime_obj = datetime.fromtimestamp(last_candle_timestamp/1000).replace(tzinfo=timezone.utc)
+        logging.info(f"Last candle time after new candles, UNIX: {last_candle_timestamp}, UTC: {last_candle_datetime_obj}")
 
         # Check last N profits
         if len(profits) >= negative_cancel_num and all(p < 0 for p in profits[-negative_cancel_num:]):

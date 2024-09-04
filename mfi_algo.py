@@ -41,4 +41,14 @@ if __name__ == "__main__":
     if args.quantity is not None:
         quantity = float(args.quantity)
 
-    run_mfi_trading_algo(args.symbol, quantity, args.config, args.dry_run)
+    out_directory_name = f"out/{datetime.now().strftime('%Y_%m_%d')}/trading/"
+
+    # Create the directory if it doesn't exist
+    if not os.path.exists(out_directory_name):
+        os.makedirs(out_directory_name)
+
+    run_mfi_trading_algo(symbol=args.symbol, 
+                         quantity=quantity, 
+                         config_path=args.config, 
+                         dry_run=args.dry_run, 
+                         out_dir=out_directory_name)
