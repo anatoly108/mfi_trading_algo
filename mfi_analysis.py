@@ -74,7 +74,7 @@ def analyze_pair(symbol):
     fee_per_trade = 0.075 / 100 # 0.075% fee per trade on level 1
     total_profit_minus_fees = trading_results["total_profit"] - fee_per_trade*trades_num*usdt
 
-    asset_price_change = round((1 - candles[0][4]/candles[-1][4]) * 100, 1)
+    asset_price_change = round((1 - float(candles[0][4])/float(candles[-1][4])) * 100, 1)
 
     result_dict = {
         "symbol": symbol,
