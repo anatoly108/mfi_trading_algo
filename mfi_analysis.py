@@ -99,11 +99,7 @@ def analyze_pair(symbol):
     return result_dict
 
 
-def main():
-    parser = argparse.ArgumentParser(description="")
-    parser.add_argument("--plot_all", action="store_true")
-    args = parser.parse_args()
-
+def mfi_analysis_main(plot_all=False, short=False):
     client = Client()
     # Fetch exchange information
     exchange_info = client.get_exchange_info()
@@ -117,6 +113,7 @@ def main():
     # for testing specific symbols
     # symbols = ["AUDIOUSDT"]
     
+    print("running analysis")
     results = []
     for symbol in tqdm(symbols):
         result = analyze_pair(symbol)
@@ -131,6 +128,7 @@ def main():
         "trades_num": res["trades_num"],
         "pnl": res["pnl"],
         "quoteVolume": convert_to_millions(float(res["quoteVolume"])),
+        "quoteVolume_raw": float(res["quoteVolume"]),
         "asset_price_change": res["asset_price_change"]
     }
         for res in results
@@ -140,13 +138,13 @@ def main():
     df = pd.DataFrame(subset_results)
     df = df.sort_values(by='total_profit', ascending=False)
 
-    out_directory_name = f"out/{datetime.now().strftime('%Y_%m_%d')}/analysis/"
+    filename_suffix = datetime.now().strftime('%Y_%m_%d_%H_%M_%S')
+    out_directory_name = f"out/{datetime.now().strftime('%Y_%m_%d')}/analysis/{filename_suffix}"
 
     # Create the directory if it doesn't exist
     if not os.path.exists(out_directory_name):
         os.makedirs(out_directory_name)
-
-    filename_suffix = datetime.now().strftime('%Y_%m_%d_%H_%M_%S')
+    
     df.to_csv(f"{out_directory_name}/{filename_suffix}_crypto_mfi_analysis.csv", index=False)
     df.to_excel(f"{out_directory_name}/{filename_suffix}_crypto_mfi_analysis.xlsx", index=False)
 
@@ -156,8 +154,9 @@ def main():
     results_top = [res for res in results if res["symbol"] in list(top_assets["symbol"])]
     results_flop = [res for res in results if res["symbol"] in list(flop_assets["symbol"])]
 
-    if args.plot_all:
-        for asset in results:
+    if plot_all:
+        print("making all plots")
+        for asset in tqdm(results):
             plot_asset(asset, "_analysis", out_dir=out_directory_name)
     else:
         # Plotting each of the top 10 assets
@@ -168,7 +167,11 @@ def main():
         for asset in results_flop:
             plot_asset(asset, "_analysis_flop", out_dir=out_directory_name)
 
-    
+    return results, df
 
 if __name__ == "__main__":
-    main()
+    parser = argparse.ArgumentParser(description="")
+    parser.add_argument("--plot_all", action="store_true")
+    args = parser.parse_args()
+
+    mfi_analysis_main(args.plot_all)
