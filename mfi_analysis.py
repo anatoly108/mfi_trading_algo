@@ -99,17 +99,18 @@ def analyze_pair(symbol):
     return result_dict
 
 
-def mfi_analysis_main(plot_all=False, short=False):
+def mfi_analysis_main(plot_all=False, short=False, symbols=None):
     client = Client()
     # Fetch exchange information
     exchange_info = client.get_exchange_info()
 
     # Filter symbols that end with 'USDT' and are available for spot trading
-    symbols = [
-        symbol['symbol'] 
-        for symbol in exchange_info['symbols'] 
-        if symbol['symbol'].endswith('USDT') and symbol['status'] == 'TRADING' and symbol['isSpotTradingAllowed']
-    ]
+    if symbols is None:
+        symbols = [
+            symbol['symbol'] 
+            for symbol in exchange_info['symbols'] 
+            if symbol['symbol'].endswith('USDT') and symbol['status'] == 'TRADING' and symbol['isSpotTradingAllowed']
+        ]
     # for testing specific symbols
     # symbols = ["AUDIOUSDT"]
     

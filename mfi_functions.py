@@ -242,9 +242,21 @@ def get_new_candles_binance_api(symbol, interval, last_candle_timestamp):
                        (datetime.fromtimestamp(last_candle_timestamp/1000) - timedelta(minutes=10)).replace(tzinfo=timezone.utc), 
                        get_last_complete_time_for_candles(interval)))
 
-def run_mfi_trading_algo(symbol, quantity, config_path, dry_run, 
+def run_mfi_trading_algo(symbol, config_path, dry_run, 
                          negative_cancel_num=3, get_new_candles_function=get_new_candles_binance_api,
-                         candles = None, exit_after_no_candle=False, do_plot=True, out_dir="out"): 
+                         candles = None, exit_after_no_candle=False, do_plot=True, out_dir="out", quantity=None, usdt_amount=None): 
+
+    if quantity is None and usdt_amount is None:
+        raise Exception("quantity is None and usdt_amount is None")
+
+    if usdt_amount is not None:
+        client = Client()
+        ticker = client.get_symbol_ticker(symbol=symbol)
+        current_price = float(ticker['price'])
+        client.close_connection()
+        quantity = usd_to_quantity(usdt_amount, current_price)
+        logging.info(f"Chosen quantity is: {quantity}, equivalent to {current_price * quantity} USDT")
+
     start_time = datetime.now()
     start_time_str = datetime.now().strftime('%Y_%m_%d_%H_%M_%S')
     

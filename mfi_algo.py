@@ -15,8 +15,8 @@ if __name__ == "__main__":
     parser = argparse.ArgumentParser(description="")
     parser.add_argument("--config", required=True, help="Path to the YAML config file containing API keys")
     parser.add_argument("--symbol", required=True, help="Symbol, e.g. BTCUSDT")
-    parser.add_argument("--quantity", required=False, help="Quantity to operate with")
-    parser.add_argument("--usdt_amount", required=False, help="USDT amount to operate with. Will be translated into corresponding asset's quantity")
+    parser.add_argument("--quantity", required=False, help="Quantity to operate with", default=None, type=float)
+    parser.add_argument("--usdt_amount", required=False, help="USDT amount to operate with. Will be translated into corresponding asset's quantity", default=None, type=float)
     parser.add_argument("--dry-run", action="store_true")
 
     args = parser.parse_args()
@@ -30,17 +30,6 @@ if __name__ == "__main__":
         logging.error("Either quantity or usdt_amount have to be specified")
         exit(1)
 
-    if args.usdt_amount is not None:
-        client = Client()
-        ticker = client.get_symbol_ticker(symbol=args.symbol)
-        current_price = float(ticker['price'])
-        client.close_connection()
-        quantity = usd_to_quantity(float(args.usdt_amount), current_price)
-        logging.info(f"Chosen quantity is: {quantity}, equivalent to {current_price * quantity} USDT")
-
-    if args.quantity is not None:
-        quantity = float(args.quantity)
-
     out_directory_name = f"out/{datetime.now().strftime('%Y_%m_%d')}/trading/"
 
     # Create the directory if it doesn't exist
@@ -48,7 +37,9 @@ if __name__ == "__main__":
         os.makedirs(out_directory_name)
 
     run_mfi_trading_algo(symbol=args.symbol, 
-                         quantity=quantity, 
+                         quantity=args.quantity, 
+                         usdt_amount=args.quantity, 
                          config_path=args.config, 
                          dry_run=args.dry_run, 
                          out_dir=out_directory_name)
+
