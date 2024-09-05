@@ -98,6 +98,10 @@ def analyze_pair(symbol):
 
 
 def main():
+    parser = argparse.ArgumentParser(description="")
+    parser.add_argument("--plot_all", action="store_true")
+    args = parser.parse_args()
+
     client = Client()
     # Fetch exchange information
     exchange_info = client.get_exchange_info()
@@ -134,7 +138,7 @@ def main():
     df = pd.DataFrame(subset_results)
     df = df.sort_values(by='total_profit', ascending=False)
 
-    out_directory_name = f"out/{datetime.now().strftime('%Y_%m_%d')}"
+    out_directory_name = f"out/{datetime.now().strftime('%Y_%m_%d')}/analysis/"
 
     # Create the directory if it doesn't exist
     if not os.path.exists(out_directory_name):
@@ -150,13 +154,19 @@ def main():
     results_top = [res for res in results if res["symbol"] in list(top_assets["symbol"])]
     results_flop = [res for res in results if res["symbol"] in list(flop_assets["symbol"])]
 
-    # Plotting each of the top 10 assets
-    for asset in results_top:
-        plot_asset(asset, "_analysis_top", out_dir=out_directory_name)
+    if args.plot_all:
+        for asset in results:
+            plot_asset(asset, "_analysis", out_dir=out_directory_name)
+    else:
+        # Plotting each of the top 10 assets
+        for asset in results_top:
+            plot_asset(asset, "_analysis_top", out_dir=out_directory_name)
 
-    # Plotting each of the flop 10 assets
-    for asset in results_flop:
-        plot_asset(asset, "_analysis_flop", out_dir=out_directory_name)
+        # Plotting each of the flop 10 assets
+        for asset in results_flop:
+            plot_asset(asset, "_analysis_flop", out_dir=out_directory_name)
+
+    
 
 if __name__ == "__main__":
     main()
