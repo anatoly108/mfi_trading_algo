@@ -74,7 +74,8 @@ def analyze_pair(symbol):
 
     trades_num = len(buy_signals) * 2
     fee_per_trade = 0.075 / 100 # 0.075% fee per trade on level 1
-    total_profit_minus_fees = trading_results["total_profit"] - fee_per_trade*trades_num*usdt
+    fees = fee_per_trade*trades_num*usdt
+    total_profit_minus_fees = trading_results["total_profit"] - fees
 
     asset_price_change = round((1 - float(candles[0][4])/float(candles[-1][4])) * 100, 1)
 
@@ -86,6 +87,7 @@ def analyze_pair(symbol):
         "sell_signals": sell_signals,
         "total_profit": round(trading_results["total_profit"], 1),
         "total_profit_minus_fees": round(total_profit_minus_fees, 1),
+        "fees": fees,
         "trades_num": trades_num,
         "pnl": round((trading_results["total_profit"]/usdt)*100, 1),
         "asset_price_change": asset_price_change
@@ -125,6 +127,7 @@ def mfi_analysis_main(plot_all=False, short=False, symbols=None):
     {
         "symbol": res["symbol"],
         "total_profit": res["total_profit"],
+        "fees": res["fees"],
         "total_profit_minus_fees": res["total_profit_minus_fees"],
         "trades_num": res["trades_num"],
         "pnl": res["pnl"],
