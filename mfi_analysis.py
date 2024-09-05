@@ -8,6 +8,7 @@ from tqdm import tqdm
 from binance.client import Client
 from scipy.signal import find_peaks
 import argparse
+import os
 from mfi_functions import load_config, setup_logging, calculate_mfi, \
                             find_extrema, plot_asset, get_candles, MFI_TIMEINTERVAL, \
                             run_mfi_trading_algo, usd_to_quantity
