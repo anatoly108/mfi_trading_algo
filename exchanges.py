@@ -23,7 +23,7 @@ class Exchange(ABC):
 
     def execute_market_order(self, symbol: str, side: str, quantity: float, dry_run: bool):
         if dry_run:
-            logging.info(f"Dry run {action}")
+            logging.info(f"Dry run {side}")
             return {'price': None}
 
         self.execute_market_order_internal(symbol, side, quantity)
