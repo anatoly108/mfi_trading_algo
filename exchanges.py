@@ -3,6 +3,7 @@ from abc import ABC, abstractmethod
 from binance.client import Client as BinanceClient
 from pymexc import spot
 import os
+import logging
 
 # Base class defining the interface
 class Exchange(ABC):
