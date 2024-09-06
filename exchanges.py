@@ -5,7 +5,6 @@ from pymexc import spot
 import os
 import logging
 
-# Base class defining the interface
 class Exchange(ABC):
     def __init__(self, config_path: str):
         if not os.path.exists(config_path):
@@ -54,7 +53,6 @@ class Exchange(ABC):
         pass
 
 
-# Binance-specific class
 class Binance(Exchange):
     def __init__(self, config_path: str):
         super().__init__(config_path)
@@ -100,9 +98,8 @@ class Binance(Exchange):
         return 0.075/100
 
     def get_all_ticker_data(self):
-        raise Exception("Not implemented")
+        return self.client.get_ticker(type="MINI")
 
-# MEXC-specific class
 class Mexc(Exchange):
     def __init__(self, config_path: str):
         super().__init__(config_path)
