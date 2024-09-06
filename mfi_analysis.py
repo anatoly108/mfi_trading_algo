@@ -65,6 +65,8 @@ def analyze_pair(ticker_data):
 
     asset_price_change = round((1 - candles[0][4]/candles[-1][4]) * 100, 1)
 
+    liquidity_score = ExchangeClient.calculate_liquidity_score(symbol)
+
     result_dict = {
         "symbol": symbol,
         "candles": candles,
@@ -76,7 +78,8 @@ def analyze_pair(ticker_data):
         "fees": fees,
         "trades_num": trades_num,
         "pnl": round((trading_results["total_profit"]/usdt)*100, 1),
-        "asset_price_change": asset_price_change
+        "asset_price_change": asset_price_change,
+        "liquidity_score": liquidity_score
     }
 
     # Add all ticker data, but update only keys that are not present in 
@@ -123,7 +126,8 @@ def mfi_analysis_main(plot_all=False, short=False, symbols=None, no_vol_threshol
         "pnl": res["pnl"],
         "quoteVolume": convert_to_millions(float(res["quoteVolume"])),
         "quoteVolume_raw": float(res["quoteVolume"]),
-        "asset_price_change": res["asset_price_change"]
+        "asset_price_change": res["asset_price_change"],
+        "liquidity_score": res["liquidity_score"]
     }
         for res in results
     ]

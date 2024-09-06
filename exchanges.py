@@ -4,6 +4,7 @@ from binance.client import Client as BinanceClient
 from pymexc import spot
 import os
 import logging
+import numpy as np
 
 class Exchange(ABC):
     def __init__(self, config_path: str):
@@ -50,6 +51,10 @@ class Exchange(ABC):
 
     @abstractmethod
     def get_taker_fee_fraction(self):
+        pass
+
+    @abstractmethod
+    def calculate_liquidity_score(self, symbol: str, depth: int):
         pass
 
 
@@ -99,6 +104,49 @@ class Binance(Exchange):
 
     def get_all_ticker_data(self):
         return self.client.get_ticker(type="MINI")
+
+    def calculate_liquidity_score(self, symbol, depth=5):
+        """
+        Calculate a liquidity score (0 to 1) based on spread and order book volume for a given symbol.
+        
+        Args:
+            symbol (str): The trading pair symbol (e.g., 'BTCUSDT').
+            depth (int): How deep into the order book to look for volume calculation (default is 5 levels).
+        
+        Returns:
+            float: Liquidity score from 0 to 1, where 1 is highly liquid and 0 is illiquid.
+        """
+        # Get the order book for the symbol
+        order_book = self.client.get_order_book(symbol=symbol)
+
+        # Access top bids and asks
+        bids = order_book['bids']  # List of [price, quantity]
+        asks = order_book['asks']  # List of [price, quantity]
+
+        # Calculate the spread (difference between the best bid and ask)
+        highest_bid = float(bids[0][0])
+        lowest_ask = float(asks[0][0])
+        spread = lowest_ask - highest_bid
+
+        # Calculate total volume on top 'depth' bid and ask levels
+        total_bid_volume = sum(float(bid[1]) for bid in bids[:depth])
+        total_ask_volume = sum(float(ask[1]) for ask in asks[:depth])
+
+        # Normalize spread (assuming a larger spread > 0.01 is bad)
+        max_spread = 0.01  # Adjust based on the symbol (for very volatile pairs)
+        spread_score = max(0, 1 - (spread / max_spread))
+
+        # Normalize volume (higher volume is better, 0 if no volume)
+        max_volume = max(total_bid_volume, total_ask_volume)
+        if max_volume == 0:
+            volume_score = 0  # No liquidity if no volume
+        else:
+            volume_score = min(total_bid_volume, total_ask_volume) / max_volume
+
+        # Combine spread and volume into a final liquidity score (weighted)
+        liquidity_score = 0.5 * spread_score + 0.5 * volume_score
+
+        return liquidity_score
 
 class Mexc(Exchange):
     def __init__(self, config_path: str):
@@ -159,3 +207,6 @@ class Mexc(Exchange):
     
     def get_taker_fee_fraction(self):
         return 0.02/100
+
+    def calculate_liquidity_score(self, symbol: str, depth=5):
+        raise Exception("Not implemented")
