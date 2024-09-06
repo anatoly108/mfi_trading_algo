@@ -25,7 +25,8 @@ MFI_TRADING_TIMEOUT_H = 12
 
 VOL_THRESHOLD = 100e3
 
-ExchangeClient = Mexc("keys.yaml")
+ExchangeClient = Binance("keys.yaml")
+
 def setup_logging(file_suffix=""):
     log_dir = os.path.join(os.getcwd(), 'logs')
     if not os.path.exists(log_dir):
