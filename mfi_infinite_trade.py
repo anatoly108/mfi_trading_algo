@@ -41,9 +41,9 @@ def main():
         logging.info(f"Iteration {iteration}")
 
         logging.info(f"Starting analysis")
-        logging.disable(logging.CRITICAL)
+        logging.disable(logging.WARNING) # to avoid logging a lot of infos
         analysis_results, analysis_df = mfi_analysis_main(symbols=args.symbols)
-        logging.disable(logging.NOTSET)
+        logging.disable(logging.INFO)
 
         analysis_df_sub = analysis_df[analysis_df.pnl > args.pnl_threshold]
         analysis_df_sub = analysis_df_sub.sort_values(by='total_profit', ascending=False)
@@ -51,7 +51,7 @@ def main():
 
         if len(chosen_assets) == 0:
             logging.info(f"Analysis finished, no assets chosen")
-            time.sleep(60 * 60) # sleep for an hour
+            time.sleep(60 * 60) # sleep for an hour if there are no good assets to trade on
             continue
 
         logging.info(f"Analysis finished, chosen assets: {chosen_assets}")

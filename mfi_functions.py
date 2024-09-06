@@ -179,7 +179,7 @@ def plot_asset(asset_data, plot_suffix="", out_dir="out"):
     sell_signals = asset_data["sell_signals"]
 
     # Convert candles to a DataFrame
-    df = pd.DataFrame(candles, columns=["timestamp", "open", "high", "low", "close", "volume", "close_time", "qav", "num_trades", "tbbav", "tbqav", "ignore"])
+    df = pd.DataFrame(candles, columns=["timestamp", "open", "high", "low", "close", "volume"])
     df["timestamp"] = pd.to_datetime(df["timestamp"], unit='ms')
     df.set_index("timestamp", inplace=True)
     df = df.astype(float)
