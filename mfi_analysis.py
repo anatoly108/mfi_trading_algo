@@ -87,7 +87,7 @@ def analyze_pair(ticker_data):
     return result_dict
 
 
-def mfi_analysis_main(plot_all=False, short=False, symbols=None):
+def mfi_analysis_main(plot_all=False, short=False, symbols=None, no_vol_threshold=False):
     # Filter symbols that end with 'USDT' and are available for spot trading
     if symbols is None:
         symbols = ExchangeClient.get_all_spot_usdt_pairs()
@@ -99,12 +99,11 @@ def mfi_analysis_main(plot_all=False, short=False, symbols=None):
 
     for symbol in symbols:
         ticker = next((ticker for ticker in tickers if ticker["symbol"] == symbol), None)
-        tickers_final.append(ticker)
-        continue
         if ticker is None:
             continue
 
-        if float(ticker["quoteVolume"]) > 1e6:
+        # 24h volume threshold
+        if float(ticker["quoteVolume"]) > 1e6/2 or no_vol_threshold: 
             tickers_final.append(ticker)
 
     print("running analysis")
@@ -167,6 +166,7 @@ def mfi_analysis_main(plot_all=False, short=False, symbols=None):
 if __name__ == "__main__":
     parser = argparse.ArgumentParser(description="")
     parser.add_argument("--plot_all", action="store_true")
+    parser.add_argument("--no_vol_threshold", action="store_true")
     args = parser.parse_args()
 
-    mfi_analysis_main(args.plot_all)
+    mfi_analysis_main(args.plot_all, args.no_vol_threshold)
