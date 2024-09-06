@@ -10,7 +10,7 @@ import argparse
 import os
 from mfi_functions import setup_logging, calculate_mfi, \
                             find_extrema, plot_asset, get_candles, MFI_TIMEINTERVAL, \
-                            run_mfi_trading_algo, usd_to_quantity, ExchangeClient
+                            run_mfi_trading_algo, usd_to_quantity, ExchangeClient, VOL_THRESHOLD
 
 def convert_to_millions(volume):
     # Convert the volume to millions
@@ -87,7 +87,7 @@ def analyze_pair(ticker_data):
     return result_dict
 
 
-def mfi_analysis_main(plot_all=False, short=False, symbols=None, no_vol_threshold=False, vol_threshold=100e3):
+def mfi_analysis_main(plot_all=False, short=False, symbols=None, no_vol_threshold=False, vol_threshold=VOL_THRESHOLD):
     # Filter symbols that end with 'USDT' and are available for spot trading
     if symbols is None:
         symbols = ExchangeClient.get_all_spot_usdt_pairs()
@@ -103,7 +103,7 @@ def mfi_analysis_main(plot_all=False, short=False, symbols=None, no_vol_threshol
             continue
 
         # 24h volume threshold
-        if float(ticker["quoteVolume"]) > 1e6/2 or no_vol_threshold: 
+        if float(ticker["quoteVolume"]) > vol_threshold or no_vol_threshold: 
             tickers_final.append(ticker)
 
     print("running analysis")
@@ -167,7 +167,7 @@ if __name__ == "__main__":
     parser = argparse.ArgumentParser(description="")
     parser.add_argument("--plot_all", action="store_true")
     parser.add_argument("--no_vol_threshold", action="store_true")
-    parser.add_argument("--vol_threshold", required=False, default=None, type=float)
+    parser.add_argument("--vol_threshold", required=False, default=VOL_THRESHOLD, type=float)
     args = parser.parse_args()
 
     mfi_analysis_main(plot_all=args.plot_all, 

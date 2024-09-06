@@ -23,6 +23,8 @@ MFI_STEP_THRESHOLD = 3
 MFI_TIMEINTERVAL = 14
 MFI_TRADING_TIMEOUT_H = 12
 
+VOL_THRESHOLD = 100e3
+
 ExchangeClient = Mexc("keys.yaml")
 def setup_logging(file_suffix=""):
     log_dir = os.path.join(os.getcwd(), 'logs')
