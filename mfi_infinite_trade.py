@@ -5,7 +5,6 @@ import requests
 import logging
 from datetime import datetime, timedelta
 from tqdm import tqdm
-from binance.client import Client
 from scipy.signal import find_peaks
 import argparse
 import os

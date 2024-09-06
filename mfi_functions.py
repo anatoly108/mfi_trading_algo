@@ -4,7 +4,6 @@ import talib as ta
 import requests
 import logging
 from datetime import datetime, timedelta, timezone
-from binance.client import Client
 from scipy.signal import find_peaks
 import os
 import matplotlib.pyplot as plt
@@ -108,7 +107,6 @@ def calculate_num_candles(interval, startTime, endTime):
 # note: this will return only complete candles!
 # startTime and endTime are datetime objects, easiest way to specify: datetime.strptime("2024-01-01 00:00:00", "%Y-%m-%d %H:%M:%S")
 def get_candles(symbol, interval, startTime=None, endTime=None):
-    url = "https://api.binance.com/api/v3/klines"
     all_candles = []
     limit = 1000  # Maximum allowed by Binance
 
@@ -208,23 +206,16 @@ def plot_asset(asset_data, plot_suffix="", out_dir="out"):
     plt.close()
 
 
-def execute_trade(symbol, quantity, action, dry_run):
-    if dry_run:
-        logging.info(f"Dry run {action}")
-        return {'price': None}
-    
-    return ExchangeClient.execute_market_order(symbol, action, quantity)
-
-def get_new_candles_binance_api(symbol, interval, last_candle_timestamp):
+def get_new_candles_from_exchange(symbol, interval, last_candle_timestamp):
     # Sleep for 60 seconds before fetching new data
     time.sleep(60)
     # get many candles just to be sure we didn't miss any due to some glitch
-    return(get_candles(symbol, "1m", 
-                       (datetime.fromtimestamp(last_candle_timestamp/1000) - timedelta(minutes=10)).replace(tzinfo=timezone.utc), 
-                       get_last_complete_time_for_candles(interval)))
+    return(ExchangeClient.get_candles(symbol, "1m", 
+                                        (datetime.fromtimestamp(last_candle_timestamp/1000) - timedelta(minutes=10)).replace(tzinfo=timezone.utc), 
+                                        get_last_complete_time_for_candles(interval)))
 
-def run_mfi_trading_algo(symbol, config_path, dry_run, 
-                         negative_cancel_num=3, get_new_candles_function=get_new_candles_binance_api,
+def run_mfi_trading_algo(symbol, dry_run, 
+                         negative_cancel_num=3, get_new_candles_function=get_new_candles_from_exchange,
                          candles = None, exit_after_no_candle=False, do_plot=True, out_dir="out", quantity=None, usdt_amount=None): 
 
     if quantity is None and usdt_amount is None:
@@ -299,7 +290,7 @@ def run_mfi_trading_algo(symbol, config_path, dry_run,
                 last_local_minima = 100
                 bought = True
                 # buy signal
-                order = execute_trade(symbol, quantity, "buy", config_path, dry_run)
+                order = ExchangeClient.execute_market_order(symbol=symbol, side="buy", quantity=quantity, dry_run=dry_run)
                 if order["price"] is None:
                     buy_price = candles[i][4] # take last close price for dry run
                 else:
@@ -331,7 +322,7 @@ def run_mfi_trading_algo(symbol, config_path, dry_run,
                 candles_since_buy = 0
                 bought = False
                 # sell signal
-                order = execute_trade(symbol, quantity, "sell", config_path, dry_run)
+                order = ExchangeClient.execute_market_order(symbol=symbol, side="sell", quantity=quantity, dry_run=dry_run)
 
                 if order["price"] is None:
                     sell_price = candles[i][4] # take last close price for dry run

@@ -3,7 +3,6 @@ import logging
 import argparse
 import yaml
 import os
-from binance.client import Client
 from datetime import datetime, timedelta
 import talib as ta
 import numpy as np
@@ -39,7 +38,6 @@ if __name__ == "__main__":
     run_mfi_trading_algo(symbol=args.symbol, 
                          quantity=args.quantity, 
                          usdt_amount=args.quantity, 
-                         config_path=args.config, 
                          dry_run=args.dry_run, 
                          out_dir=out_directory_name)
 

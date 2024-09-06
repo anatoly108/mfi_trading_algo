@@ -5,7 +5,6 @@ import requests
 import logging
 from datetime import datetime, timedelta
 from tqdm import tqdm
-from binance.client import Client
 from scipy.signal import find_peaks
 import argparse
 import os
@@ -50,7 +49,6 @@ def analyze_pair(symbol):
     quantity = usd_to_quantity(usdt, candles[-1][4]) # latest close price to figure out quantity, assume $1k trades
     trading_results = run_mfi_trading_algo(symbol = symbol, 
                                            quantity = quantity, 
-                                           config_path = None, 
                                            dry_run = True,
                                            candles = candles_part1,
                                            get_new_candles_function = get_new_candles_for_analysis,

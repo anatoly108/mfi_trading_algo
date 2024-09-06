@@ -20,13 +20,20 @@ class Exchange(ABC):
         self.api_key = config.get(self.__class__.__name__.lower(), {}).get('api_key')
         self.api_secret = config.get(self.__class__.__name__.lower(), {}).get('api_secret')
 
+    def execute_market_order(self, symbol: str, side: str, quantity: float, dry_run: bool):
+        if dry_run:
+            logging.info(f"Dry run {action}")
+            return {'price': None}
+
+        self.execute_market_order_internal(symbol, side, quantity)
+
     # Abstract methods to be implemented by child classes
     @abstractmethod
     def get_candles(self, symbol: str, interval: str, limit: int, startTime: int, endTime: int):
         pass
 
     @abstractmethod
-    def execute_market_order(self, symbol: str, side: str, quantity: float):
+    def execute_market_order_internal(self, symbol: str, side: str, quantity: float):
         pass
 
     @abstractmethod
@@ -53,7 +60,7 @@ class Binance(Exchange):
         ]
         return formatted_candles
 
-    def execute_market_order(self, symbol: str, side: str, quantity: float):
+    def execute_market_order_internal(self, symbol: str, side: str, quantity: float):
         if side.upper() == "BUY":
             order = self.client.order_market_buy(symbol=symbol, quantity=quantity)
         elif side.upper() == "SELL":
@@ -98,7 +105,7 @@ class Mexc(Exchange):
         ]
         return formatted_candles
 
-    def execute_market_order(self, symbol: str, side: str, quantity: float):
+    def execute_market_order_internal(self, symbol: str, side: str, quantity: float):
         # Place a market order
         order = self.client.create_order(symbol=symbol, side=side.upper(), order_type="MARKET", quantity=quantity)
         
