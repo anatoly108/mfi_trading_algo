@@ -1,7 +1,7 @@
 import yaml
 from abc import ABC, abstractmethod
 from binance.client import Client as BinanceClient
-from pymexc import MexcClient
+from pymexc import spot
 import os
 
 # Base class defining the interface
@@ -46,6 +46,7 @@ class Binance(Exchange):
     
     def get_candles(self, symbol: str, interval: str, limit: int, startTime: int, endTime: int):
         candles = self.client.get_klines(symbol=symbol, interval=interval, limit=limit)
+        # time, open, high, low, close, volume
         formatted_candles = [
             [int(candle[0]), float(candle[1]), float(candle[2]), float(candle[3]), float(candle[4]), float(candle[5])]
             for candle in candles
@@ -67,8 +68,9 @@ class Binance(Exchange):
         return {'price': final_price, 'order_obj': order}
     
     def get_ticker_data(self, symbol: str):
-        ticker = self.client.get_symbol_ticker(symbol=symbol)
-        return ticker
+        url = f"https://api.binance.com/api/v3/ticker/24hr?symbol={symbol}"
+        response = requests.get(url)
+        return(response.json())
 
     def get_all_spot_usdt_pairs(self):
         exchange_info = self.client.get_exchange_info()
@@ -84,11 +86,12 @@ class Mexc(Exchange):
     def __init__(self, config_path: str):
         super().__init__(config_path)
         # Initialize the MEXC client with API key and secret
-        self.client = MexcClient(api_key=self.api_key, api_secret=self.api_secret)
+        self.client = spot.HTTP(api_key=self.api_key, api_secret=self.api_secret)
 
     def get_candles(self, symbol: str, interval: str, limit: int, startTime: int, endTime: int):
         # Fetch Kline/Candlestick data
-        candles = self.client.get_klines(symbol=symbol, interval=interval, limit=limit, start_time=startTime, end_time=endTime)
+        candles = self.client.klines(symbol=symbol, interval=interval, limit=limit, start_time=startTime, end_time=endTime)
+        # time, open, high, low, close, volume
         formatted_candles = [
             [int(candle[0]), float(candle[1]), float(candle[2]), float(candle[3]), float(candle[4]), float(candle[5])]
             for candle in candles
@@ -120,14 +123,14 @@ class Mexc(Exchange):
 
     def get_ticker_data(self, symbol: str):
         # Get 24-hour ticker data for a given symbol
-        ticker = self.client.get_ticker_24hr(symbol)
+        ticker = self.client.ticker_24h(symbol)
         return ticker
 
     def get_all_spot_usdt_pairs(self):
         # Fetch all trading pairs and filter for USDT pairs
-        exchange_info = self.client.get_exchange_info()
+        exchange_info = self.client.exchange_info()
         usdt_pairs = [
             symbol['symbol'] for symbol in exchange_info['symbols']
-            if symbol['symbol'].endswith('USDT') and symbol['isSpotTradingAllowed'] and symbol['status'] == 'TRADING'
+            if symbol['quoteAsset'] == "USDT" and "SPOT" in symbol['permissions']
         ]
         return usdt_pairs

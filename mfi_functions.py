@@ -301,7 +301,7 @@ def run_mfi_trading_algo(symbol, config_path, dry_run,
                 # buy signal
                 order = execute_trade(symbol, quantity, "buy", config_path, dry_run)
                 if order["price"] is None:
-                    buy_price = float(candles[i][4]) # take last close price for dry run
+                    buy_price = candles[i][4] # take last close price for dry run
                 else:
                     buy_price = float(order["price"])
                 buy_signals.append(i)
@@ -334,7 +334,7 @@ def run_mfi_trading_algo(symbol, config_path, dry_run,
                 order = execute_trade(symbol, quantity, "sell", config_path, dry_run)
 
                 if order["price"] is None:
-                    sell_price = float(candles[i][4]) # take last close price for dry run
+                    sell_price = candles[i][4] # take last close price for dry run
                 else:
                     sell_price = float(order["price"])
 

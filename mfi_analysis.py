@@ -13,15 +13,6 @@ from mfi_functions import setup_logging, calculate_mfi, \
                             find_extrema, plot_asset, get_candles, MFI_TIMEINTERVAL, \
                             run_mfi_trading_algo, usd_to_quantity, ExchangeClient
 
-def calculate_price_change(candles, minima, maxima):
-    changes = []
-    for i in range(len(minima)):
-        if i < len(maxima):
-            min_price = float(candles[minima[i]][4])
-            max_price = float(candles[maxima[i]][4])
-            changes.append((max_price - min_price) / min_price * 100)
-    return changes
-
 def convert_to_millions(volume):
     # Convert the volume to millions
     volume_in_millions = volume / 1_000_000
@@ -56,7 +47,7 @@ def analyze_pair(symbol):
     )
 
     usdt = 1000
-    quantity = usd_to_quantity(usdt, float(candles[-1][4])) # latest close price to figure out quantity, assume $1k trades
+    quantity = usd_to_quantity(usdt, candles[-1][4]) # latest close price to figure out quantity, assume $1k trades
     trading_results = run_mfi_trading_algo(symbol = symbol, 
                                            quantity = quantity, 
                                            config_path = None, 
@@ -68,16 +59,14 @@ def analyze_pair(symbol):
     buy_signals = trading_results["buy_signals"]
     sell_signals = trading_results["sell_signals"]
     
-    url = f"https://api.binance.com/api/v3/ticker/24hr?symbol={symbol}"
-    response = requests.get(url)
-    ticker_data = response.json()
+    ticker_data = ExchangeClient.get_ticker_data(symbol)
 
     trades_num = len(buy_signals) * 2
     fee_per_trade = 0.075 / 100 # 0.075% fee per trade on level 1
     fees = fee_per_trade*trades_num*usdt
     total_profit_minus_fees = trading_results["total_profit"] - fees
 
-    asset_price_change = round((1 - float(candles[0][4])/float(candles[-1][4])) * 100, 1)
+    asset_price_change = round((1 - candles[0][4]/candles[-1][4]) * 100, 1)
 
     result_dict = {
         "symbol": symbol,
