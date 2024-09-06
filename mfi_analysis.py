@@ -98,7 +98,7 @@ def mfi_analysis_main(plot_all=False, short=False, symbols=None):
     tickers_final = []
 
     for symbol in symbols:
-        ticker = next([ticker for ticker in tickers if ticker["symbol"] == symbol], None)
+        ticker = next((ticker for ticker in tickers if ticker["symbol"] == symbol), None)
         if ticker is None:
             continue
 
