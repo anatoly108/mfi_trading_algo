@@ -26,6 +26,11 @@ def convert_to_millions(volume):
 
 
 def analyze_pair(symbol):
+    ticker_data = ExchangeClient.get_ticker_data(symbol)
+    if float(ticker_data["quoteVolume"]) < 1e6:
+        # skip low-volume coins, it's much riskier
+        return
+
     candles = get_candles(symbol, "1m")
     if len(candles) == 0:
         return None
@@ -56,11 +61,9 @@ def analyze_pair(symbol):
                                            do_plot = False)
     buy_signals = trading_results["buy_signals"]
     sell_signals = trading_results["sell_signals"]
-    
-    ticker_data = ExchangeClient.get_ticker_data(symbol)
 
     trades_num = len(buy_signals) * 2
-    fee_per_trade = 0.075 / 100 # 0.075% fee per trade on level 1
+    fee_per_trade = ExchangeClient.get_taker_fee_fraction()
     fees = fee_per_trade*trades_num*usdt
     total_profit_minus_fees = trading_results["total_profit"] - fees
 

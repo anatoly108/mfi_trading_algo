@@ -24,7 +24,6 @@ MFI_TIMEINTERVAL = 14
 MFI_TRADING_TIMEOUT_H = 12
 
 ExchangeClient = Mexc("keys.yaml")
-
 def setup_logging(file_suffix=""):
     log_dir = os.path.join(os.getcwd(), 'logs')
     if not os.path.exists(log_dir):
@@ -35,12 +34,24 @@ def setup_logging(file_suffix=""):
 
     logging.basicConfig(
         level=logging.INFO,
-        format='%(asctime)s - %(message)s',
+        format='%(asctime)s - %(levelname)s - %(message)s',
         handlers=[
             logging.FileHandler(log_filepath),
             logging.StreamHandler()
         ]
     )
+
+    # Define a custom exception hook to log uncaught exceptions
+    def log_exception(exc_type, exc_value, exc_traceback):
+        if issubclass(exc_type, KeyboardInterrupt):
+            # Don't log KeyboardInterrupt to avoid log spam when user interrupts
+            sys.__excepthook__(exc_type, exc_value, exc_traceback)
+            return
+        logging.error("Uncaught exception", exc_info=(exc_type, exc_value, exc_traceback))
+
+    # Set the custom exception hook as the global one
+    sys.excepthook = log_exception
+
 
 def usd_to_quantity(usdt_amount, current_price):
     return(round(usdt_amount / current_price))

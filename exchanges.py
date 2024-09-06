@@ -45,6 +45,10 @@ class Exchange(ABC):
     def get_all_spot_usdt_pairs(self):
         pass
 
+    @abstractmethod
+    def get_taker_fee_fraction(self):
+        pass
+
 
 # Binance-specific class
 class Binance(Exchange):
@@ -88,6 +92,8 @@ class Binance(Exchange):
         ]
         return usdt_pairs
 
+    def get_taker_fee_fraction(self):
+        return 0.075/100
 
 # MEXC-specific class
 class Mexc(Exchange):
@@ -142,3 +148,6 @@ class Mexc(Exchange):
             if symbol['quoteAsset'] == "USDT" and "SPOT" in symbol['permissions']
         ]
         return usdt_pairs
+    
+    def get_taker_fee_fraction(self):
+        return 0.02/100
