@@ -242,7 +242,7 @@ def run_mfi_trading_algo(symbol, dry_run,
         raise Exception("quantity is None and usdt_amount is None")
 
     ticker = ExchangeClient.get_ticker_data(symbol=symbol)
-    current_price = float(ticker['price'])
+    current_price = float(ticker['lastPrice'])
     
     if usdt_amount is not None:
         quantity = usd_to_quantity(usdt_amount, current_price)
