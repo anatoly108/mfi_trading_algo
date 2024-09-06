@@ -42,6 +42,10 @@ class Exchange(ABC):
         pass
 
     @abstractmethod
+    def get_all_ticker_data(self):
+        pass
+
+    @abstractmethod
     def get_all_spot_usdt_pairs(self):
         pass
 
@@ -95,6 +99,9 @@ class Binance(Exchange):
     def get_taker_fee_fraction(self):
         return 0.075/100
 
+    def get_all_ticker_data(self):
+        raise Exception("Not implemented")
+
 # MEXC-specific class
 class Mexc(Exchange):
     def __init__(self, config_path: str):
@@ -139,6 +146,10 @@ class Mexc(Exchange):
         # Get 24-hour ticker data for a given symbol
         ticker = self.client.ticker_24h(symbol)
         return ticker
+
+    def get_all_ticker_data(self):
+        tickers = self.client.ticker_24h()
+        return tickers
 
     def get_all_spot_usdt_pairs(self):
         # Fetch all trading pairs and filter for USDT pairs

@@ -25,12 +25,8 @@ def convert_to_millions(volume):
         return f"{volume_in_millions:.1f}M"
 
 
-def analyze_pair(symbol):
-    ticker_data = ExchangeClient.get_ticker_data(symbol)
-    if float(ticker_data["quoteVolume"]) < 1e6:
-        # skip low-volume coins, it's much riskier
-        return
-
+def analyze_pair(ticker_data):
+    symbol = ticker_data["symbol"]
     candles = get_candles(symbol, "1m")
     if len(candles) == 0:
         return None
@@ -98,10 +94,21 @@ def mfi_analysis_main(plot_all=False, short=False, symbols=None):
     # for testing specific symbols
     # symbols = ["AUDIOUSDT"]
     
+    tickers = ExchangeClient.get_all_ticker_data()
+    tickers_final = []
+
+    for symbol in symbols:
+        ticker = next([ticker for ticker in tickers if ticker["symbol"] == symbol], None)
+        if ticker is None:
+            continue
+
+        if float(ticker["quoteVolume"]) > 1e6:
+            tickers_final.append(ticker)
+
     print("running analysis")
     results = []
-    for symbol in tqdm(symbols):
-        result = analyze_pair(symbol)
+    for ticker in tqdm(tickers_final):
+        result = analyze_pair(ticker)
         if result:
             results.append(result)
     
