@@ -87,9 +87,7 @@ class Binance(Exchange):
         return {'price': final_price, 'order_obj': order}
     
     def get_ticker_data(self, symbol: str):
-        url = f"https://api.binance.com/api/v3/ticker/24hr?symbol={symbol}"
-        response = requests.get(url)
-        return(response.json())
+        return(self.client.get_ticker(symbol=symbol, type="MINI"))
 
     def get_all_spot_usdt_pairs(self):
         exchange_info = self.client.get_exchange_info()
