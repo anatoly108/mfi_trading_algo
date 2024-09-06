@@ -21,7 +21,7 @@ def run_mfi_trading_algo_wrapper(**kwargs):
     setup_logging(log_dir = out_directory_name, file_suffix=f"{kwargs["symbol"]}_", log_to_stdout=False)
     return run_mfi_trading_algo(**kwargs)
 
-def main():
+if __name__ == "__main__":
     parser = argparse.ArgumentParser(description="")
     parser.add_argument("--config", required=True, help="Path to the YAML config file containing API keys")
     parser.add_argument("--usdt_amount", required=True, help="USDT amount to operate with. Will be translated into corresponding asset's quantity", type=float)
