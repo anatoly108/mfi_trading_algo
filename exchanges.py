@@ -105,7 +105,7 @@ class Binance(Exchange):
     def get_all_ticker_data(self):
         return self.client.get_ticker(type="MINI")
 
-    def calculate_liquidity_score(self, symbol, depth=5):
+    def calculate_liquidity_score(self, symbol, depth=200):
         """
         Calculate a liquidity score (0 to 1) based on spread and order book volume for a given symbol.
         
@@ -117,7 +117,7 @@ class Binance(Exchange):
             float: Liquidity score from 0 to 1, where 1 is highly liquid and 0 is illiquid.
         """
         # Get the order book for the symbol
-        order_book = self.client.get_order_book(symbol=symbol)
+        order_book = self.client.get_order_book(symbol=symbol, limit=200)
 
         # Access top bids and asks
         bids = order_book['bids']  # List of [price, quantity]
@@ -129,8 +129,8 @@ class Binance(Exchange):
         spread = lowest_ask - highest_bid
 
         # Calculate total volume on top 'depth' bid and ask levels
-        total_bid_volume = sum(float(bid[1]) for bid in bids[:depth])
-        total_ask_volume = sum(float(ask[1]) for ask in asks[:depth])
+        total_bid_volume = sum(float(bid[1]) for bid in bids[:min(len(bids), depth)])
+        total_ask_volume = sum(float(ask[1]) for ask in asks[:min(len(asks), depth)])
 
         # Normalize spread (assuming a larger spread > 0.01 is bad)
         max_spread = 0.01  # Adjust based on the symbol (for very volatile pairs)
