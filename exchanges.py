@@ -111,30 +111,39 @@ class Binance(Exchange):
         
         Args:
             symbol (str): The trading pair symbol (e.g., 'BTCUSDT').
-            depth (int): How deep into the order book to look for volume calculation (default is 5 levels).
+            depth (int): How deep into the order book to look for volume calculation (default is 200 levels).
         
         Returns:
             float: Liquidity score from 0 to 1, where 1 is highly liquid and 0 is illiquid.
         """
         # Get the order book for the symbol
-        order_book = self.client.get_order_book(symbol=symbol, limit=200)
+        order_book = self.client.get_order_book(symbol=symbol, limit=depth)
 
         # Access top bids and asks
         bids = order_book['bids']  # List of [price, quantity]
         asks = order_book['asks']  # List of [price, quantity]
+
+        # If there are no bids or asks, return 0 liquidity score
+        if not bids or not asks:
+            return 0
 
         # Calculate the spread (difference between the best bid and ask)
         highest_bid = float(bids[0][0])
         lowest_ask = float(asks[0][0])
         spread = lowest_ask - highest_bid
 
+        # Calculate the mid-price (average of highest bid and lowest ask)
+        mid_price = (highest_bid + lowest_ask) / 2
+
+        # Dynamically calculate max_spread as a small percentage of mid-price (e.g., 0.05%)
+        max_spread = mid_price * 0.0005  # 0.05% of the mid price
+
+        # Normalize spread score (smaller spread is better)
+        spread_score = max(0, 1 - (spread / max_spread))
+
         # Calculate total volume on top 'depth' bid and ask levels
         total_bid_volume = sum(float(bid[1]) for bid in bids[:min(len(bids), depth)])
         total_ask_volume = sum(float(ask[1]) for ask in asks[:min(len(asks), depth)])
-
-        # Normalize spread (assuming a larger spread > 0.01 is bad)
-        max_spread = 0.01  # Adjust based on the symbol (for very volatile pairs)
-        spread_score = max(0, 1 - (spread / max_spread))
 
         # Normalize volume (higher volume is better, 0 if no volume)
         max_volume = max(total_bid_volume, total_ask_volume)
