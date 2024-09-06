@@ -87,7 +87,7 @@ def analyze_pair(ticker_data):
     return result_dict
 
 
-def mfi_analysis_main(plot_all=False, short=False, symbols=None, no_vol_threshold=False):
+def mfi_analysis_main(plot_all=False, short=False, symbols=None, no_vol_threshold=False, vol_threshold=100e3):
     # Filter symbols that end with 'USDT' and are available for spot trading
     if symbols is None:
         symbols = ExchangeClient.get_all_spot_usdt_pairs()
@@ -167,6 +167,9 @@ if __name__ == "__main__":
     parser = argparse.ArgumentParser(description="")
     parser.add_argument("--plot_all", action="store_true")
     parser.add_argument("--no_vol_threshold", action="store_true")
+    parser.add_argument("--vol_threshold", required=False, default=None, type=float)
     args = parser.parse_args()
 
-    mfi_analysis_main(args.plot_all, args.no_vol_threshold)
+    mfi_analysis_main(plot_all=args.plot_all, 
+                      no_vol_threshold=args.no_vol_threshold, 
+                      vol_threshold=args.vol_threshold)
