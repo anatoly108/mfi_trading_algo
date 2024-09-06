@@ -9,9 +9,9 @@ from binance.client import Client
 from scipy.signal import find_peaks
 import argparse
 import os
-from mfi_functions import load_config, setup_logging, calculate_mfi, \
+from mfi_functions import setup_logging, calculate_mfi, \
                             find_extrema, plot_asset, get_candles, MFI_TIMEINTERVAL, \
-                            run_mfi_trading_algo, usd_to_quantity
+                            run_mfi_trading_algo, usd_to_quantity, ExchangeClient
 
 def calculate_price_change(candles, minima, maxima):
     changes = []
@@ -102,17 +102,9 @@ def analyze_pair(symbol):
 
 
 def mfi_analysis_main(plot_all=False, short=False, symbols=None):
-    client = Client()
-    # Fetch exchange information
-    exchange_info = client.get_exchange_info()
-
     # Filter symbols that end with 'USDT' and are available for spot trading
     if symbols is None:
-        symbols = [
-            symbol['symbol'] 
-            for symbol in exchange_info['symbols'] 
-            if symbol['symbol'].endswith('USDT') and symbol['status'] == 'TRADING' and symbol['isSpotTradingAllowed']
-        ]
+        symbols = ExchangeClient.get_all_spot_usdt_pairs()
     # for testing specific symbols
     # symbols = ["AUDIOUSDT"]
     

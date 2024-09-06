@@ -11,6 +11,7 @@ import matplotlib.pyplot as plt
 import mplfinance as mpf
 import yaml
 import time
+from exchanges import Binance, Mexc
 
 MFI_THRESHOLD_LOW = 20
 MFI_THRESHOLD_LOW_EXTENDED = MFI_THRESHOLD_LOW + 10
@@ -23,9 +24,7 @@ MFI_STEP_THRESHOLD = 3
 MFI_TIMEINTERVAL = 14
 MFI_TRADING_TIMEOUT_H = 12
 
-def load_config(config_file):
-    with open(config_file, 'r') as file:
-        return yaml.safe_load(file)
+ExchangeClient = Mexc("keys.yaml")
 
 def setup_logging(file_suffix=""):
     log_dir = os.path.join(os.getcwd(), 'logs')
@@ -125,17 +124,12 @@ def get_candles(symbol, interval, startTime=None, endTime=None):
 
     while len(all_candles) < num_candles:
         current_limit = min(limit, num_candles - len(all_candles))
-        params = {
-            "symbol": symbol,
-            "interval": interval,
-            "startTime": startTimeUnix,
-            "endTime": endTimeUnix,
-            "limit": current_limit # Fetch only the remaining needed candles
-        }
+        candles = ExchangeClient.get_candles(symbol=symbol,
+                                             interval=interval,
+                                             startTime=startTimeUnix,
+                                             endTime=endTimeUnix,
+                                             limit=current_limit) # Fetch only the remaining needed candles
         
-        response = requests.get(url, params=params)
-        candles = response.json()
-
         if not candles:
             break
         
@@ -214,25 +208,12 @@ def plot_asset(asset_data, plot_suffix="", out_dir="out"):
     plt.close()
 
 
-def execute_trade(symbol, quantity, action, config_path, dry_run):
+def execute_trade(symbol, quantity, action, dry_run):
     if dry_run:
         logging.info(f"Dry run {action}")
         return {'price': None}
-
-    config = load_config(config_path)
-    client = Client(config['api_key'], config['api_secret'])
-    if action == 'buy':
-        order = client.order_market_buy(symbol=symbol, quantity=quantity)
-        logging.info(f"Market Buy Order: {order}")
-    elif action == 'sell':
-        order = client.order_market_sell(symbol=symbol, quantity=quantity)
-        logging.info(f"Market Sell Order: {order}")
     
-    client.close_connection()
-
-    final_price = np.mean([float(fill['price']) for fill in order['fills']])
-
-    return {'price': final_price}
+    return ExchangeClient.execute_market_order(symbol, action, quantity)
 
 def get_new_candles_binance_api(symbol, interval, last_candle_timestamp):
     # Sleep for 60 seconds before fetching new data
@@ -250,10 +231,8 @@ def run_mfi_trading_algo(symbol, config_path, dry_run,
         raise Exception("quantity is None and usdt_amount is None")
 
     if usdt_amount is not None:
-        client = Client()
-        ticker = client.get_symbol_ticker(symbol=symbol)
+        ticker = ExchangeClient.get_ticker_data(symbol=symbol)
         current_price = float(ticker['price'])
-        client.close_connection()
         quantity = usd_to_quantity(usdt_amount, current_price)
         logging.info(f"Chosen quantity is: {quantity}, equivalent to {current_price * quantity} USDT")
 
