@@ -64,7 +64,7 @@ class Binance(Exchange):
         self.client = BinanceClient(self.api_key, self.api_secret)
     
     def get_candles(self, symbol: str, interval: str, limit: int, startTime: int, endTime: int):
-        candles = self.client.get_klines(symbol=symbol, interval=interval, limit=limit)
+        candles = self.client.get_klines(symbol=symbol, interval=interval, limit=limit, startTime=startTime, endTime=endTime)
         # time, open, high, low, close, volume
         formatted_candles = [
             [int(candle[0]), float(candle[1]), float(candle[2]), float(candle[3]), float(candle[4]), float(candle[5])]

@@ -230,9 +230,10 @@ def get_new_candles_from_exchange(symbol, interval, last_candle_timestamp):
     # Sleep for 60 seconds before fetching new data
     time.sleep(60)
     # get many candles just to be sure we didn't miss any due to some glitch
-    return(ExchangeClient.get_candles(symbol, "1m", 
-                                        (datetime.fromtimestamp(last_candle_timestamp/1000) - timedelta(minutes=10)).replace(tzinfo=timezone.utc), 
-                                        get_last_complete_time_for_candles(interval)))
+    return(get_candles(symbol=symbol, 
+                        interval="1m", 
+                        startTime=datetime.fromtimestamp(last_candle_timestamp/1000, tz=timezone.utc) - timedelta(minutes=10), 
+                        endTime=get_last_complete_time_for_candles(interval)))
 
 def run_mfi_trading_algo(symbol, dry_run, 
                          negative_cancel_num=3, get_new_candles_function=get_new_candles_from_exchange,
@@ -379,7 +380,7 @@ def run_mfi_trading_algo(symbol, dry_run,
         
         # Get next candle and add it
         last_candle_timestamp = candles[-1][0]
-        last_candle_datetime_obj = datetime.fromtimestamp(last_candle_timestamp/1000).replace(tzinfo=timezone.utc)
+        last_candle_datetime_obj = datetime.fromtimestamp(last_candle_timestamp/1000, tz=timezone.utc)
         logging.info(f"Last candle time before new candles, UNIX: {last_candle_timestamp}, UTC: {last_candle_datetime_obj}")
         
         new_candles = get_new_candles_function(symbol, "1m", last_candle_timestamp)
@@ -397,7 +398,7 @@ def run_mfi_trading_algo(symbol, dry_run,
         
         candles.extend(really_new_candles)
         last_candle_timestamp = candles[-1][0]
-        last_candle_datetime_obj = datetime.fromtimestamp(last_candle_timestamp/1000).replace(tzinfo=timezone.utc)
+        last_candle_datetime_obj = datetime.fromtimestamp(last_candle_timestamp/1000, tz=timezone.utc)
         logging.info(f"Last candle time after new candles, UNIX: {last_candle_timestamp}, UTC: {last_candle_datetime_obj}")
 
         # Check last N profits

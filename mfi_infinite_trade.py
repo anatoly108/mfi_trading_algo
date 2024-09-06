@@ -25,13 +25,17 @@ if __name__ == "__main__":
     parser = argparse.ArgumentParser(description="")
     parser.add_argument("--config", required=True, help="Path to the YAML config file containing API keys")
     parser.add_argument("--usdt_amount", required=True, help="USDT amount to operate with. Will be translated into corresponding asset's quantity", type=float)
-    parser.add_argument("--symbols", default=None)
     parser.add_argument("--pnl_threshold", default=2, type=float)
     parser.add_argument("--liq_threshold", default=0.2, type=float)
     parser.add_argument("--n_assets_to_trade", default=3, type=int)
     parser.add_argument("--dry-run", action="store_true")
+    parser.add_argument("--symbols", default=None, type=str)
 
     args = parser.parse_args()
+
+    symbols = None
+    if args.symbols is not None:
+        symbols = args.symbols.split(",")
 
     out_directory_name = f"out/{datetime.now().strftime('%Y_%m_%d')}/trading/"
     if not os.path.exists(out_directory_name):
@@ -55,8 +59,8 @@ if __name__ == "__main__":
 
         logging.info(f"Starting analysis")
         logging.disable(logging.WARNING) # to avoid logging a lot of infos
-        analysis_results, analysis_df = mfi_analysis_main(symbols=args.symbols)
-        logging.disable(logging.INFO)
+        analysis_results, analysis_df = mfi_analysis_main(symbols=symbols)
+        logging.disable(logging.NOTSET)
 
         analysis_df_sub = analysis_df[(analysis_df.pnl >= args.pnl_threshold) & (analysis_df.liquidity_score > args.liq_threshold)]
         analysis_df_sub = analysis_df_sub.sort_values(by='total_profit', ascending=False)
@@ -69,7 +73,7 @@ if __name__ == "__main__":
 
         logging.info(f"Analysis finished, chosen assets: {chosen_assets}")
 
-        with concurrent.futures.ThreadPoolExecutor() as executor:
+        with concurrent.futures.ProcessPoolExecutor() as executor:
             # Submit the function with different arguments
             futures = []
             for asset in chosen_assets:
