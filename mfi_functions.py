@@ -27,23 +27,25 @@ VOL_THRESHOLD = 100e3
 
 ExchangeClient = Binance("keys.yaml")
 
-def setup_logging(log_dir=None, file_suffix=""):
+def setup_logging(log_dir=None, file_suffix="", log_to_stdout=True):
     if log_dir is None:
         log_dir = os.path.join(os.getcwd(), 'out')
-        
+
     if not os.path.exists(log_dir):
         os.makedirs(log_dir)
 
     log_filename = f"{file_suffix}{datetime.now().strftime('%Y_%m_%d_%H_%M_%S')}.txt"
     log_filepath = os.path.join(log_dir, log_filename)
 
+    handlers = [logging.FileHandler(log_filepath)]  # Log to file by default
+
+    if log_to_stdout:
+        handlers.append(logging.StreamHandler())  # Log to console if requested
+
     logging.basicConfig(
         level=logging.INFO,
         format='%(asctime)s - %(levelname)s - %(message)s',
-        handlers=[
-            logging.FileHandler(log_filepath),
-            logging.StreamHandler()
-        ]
+        handlers=handlers
     )
 
     # Define a custom exception hook to log uncaught exceptions
@@ -56,6 +58,7 @@ def setup_logging(log_dir=None, file_suffix=""):
 
     # Set the custom exception hook as the global one
     sys.excepthook = log_exception
+
 
 
 def usd_to_quantity(usdt_amount, current_price):
@@ -237,11 +240,14 @@ def run_mfi_trading_algo(symbol, dry_run,
     if quantity is None and usdt_amount is None:
         raise Exception("quantity is None and usdt_amount is None")
 
+    ticker = ExchangeClient.get_ticker_data(symbol=symbol)
+    current_price = float(ticker['price'])
+    
     if usdt_amount is not None:
-        ticker = ExchangeClient.get_ticker_data(symbol=symbol)
-        current_price = float(ticker['price'])
         quantity = usd_to_quantity(usdt_amount, current_price)
-        logging.info(f"Chosen quantity is: {quantity}, equivalent to {current_price * quantity} USDT")
+    
+    usdt_amount_final = current_price * quantity
+    logging.info(f"Chosen quantity is: {quantity}, equivalent to {usdt_amount_final} USDT")
 
     start_time = datetime.now()
     start_time_str = datetime.now().strftime('%Y_%m_%d_%H_%M_%S')
@@ -403,7 +409,9 @@ def run_mfi_trading_algo(symbol, dry_run,
             logging.info(f"Running time exceeded {MFI_TRADING_TIMEOUT_H} hours. Exiting.")
             break
 
-    logging.info(f"Finished. Total profit: {total_profit}")
+    total_profit_minus_fees = (len(buy_signals) + len(sell_signals))*usdt_amount_final*ExchangeClient.get_taker_fee_fraction()
+
+    logging.info(f"Finished. Total profit: {total_profit}, minus fees: {total_profit_minus_fees}")
 
     return({
             "symbol": symbol,
@@ -412,6 +420,7 @@ def run_mfi_trading_algo(symbol, dry_run,
             "buy_signals": buy_signals,
             "sell_signals": sell_signals,
             "total_profit": total_profit,
+            "total_profit_minus_fees": total_profit_minus_fees,
             "profits": profits
         })
 

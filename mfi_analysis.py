@@ -147,7 +147,7 @@ def mfi_analysis_main(plot_all=False, short=False, symbols=None, no_vol_threshol
     df.to_excel(f"{out_directory_name}/{filename_suffix}_crypto_mfi_analysis.xlsx", index=False)
 
     # Select top 10 assets based on highest total_profit
-    top_assets = df[1:min([10, df.shape[0]])]
+    top_assets = df[0:min([9, df.shape[0]])]
     flop_assets = df[-min([10, df.shape[0]]):]
     results_top = [res for res in results if res["symbol"] in list(top_assets["symbol"])]
     results_flop = [res for res in results if res["symbol"] in list(flop_assets["symbol"])]
