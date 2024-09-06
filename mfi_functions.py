@@ -10,6 +10,7 @@ import matplotlib.pyplot as plt
 import mplfinance as mpf
 import yaml
 import time
+import sys
 from exchanges import Binance, Mexc
 
 MFI_THRESHOLD_LOW = 20
