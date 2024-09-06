@@ -26,12 +26,11 @@ def main():
 
     args = parser.parse_args()
 
-    out_directory_name = f"out/{datetime.now().strftime('%Y_%m_%d')}/"
-    filename_suffix = datetime.now().strftime('%Y_%m_%d_%H_%M_%S')
+    out_directory_name = f"out/{datetime.now().strftime('%Y_%m_%d')}/trading/"
     if not os.path.exists(out_directory_name):
         os.makedirs(out_directory_name)
 
-    setup_logging(f"infinite_trade_{filename_suffix}")
+    setup_logging(log_dir=out_directory_name, file_suffix=f"infinite_trade")
 
     logging.info(f"Started infinite trade script")
     iteration = 0

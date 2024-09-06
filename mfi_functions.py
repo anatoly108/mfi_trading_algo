@@ -27,8 +27,10 @@ VOL_THRESHOLD = 100e3
 
 ExchangeClient = Binance("keys.yaml")
 
-def setup_logging(file_suffix=""):
-    log_dir = os.path.join(os.getcwd(), 'logs')
+def setup_logging(log_dir=None, file_suffix=""):
+    if log_dir is None:
+        log_dir = os.path.join(os.getcwd(), 'out')
+        
     if not os.path.exists(log_dir):
         os.makedirs(log_dir)
 

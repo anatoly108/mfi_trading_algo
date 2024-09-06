@@ -12,15 +12,15 @@ from mfi_functions import setup_logging, run_mfi_trading_algo, usd_to_quantity
 
 if __name__ == "__main__":
     parser = argparse.ArgumentParser(description="")
-    parser.add_argument("--config", required=True, help="Path to the YAML config file containing API keys")
     parser.add_argument("--symbol", required=True, help="Symbol, e.g. BTCUSDT")
     parser.add_argument("--quantity", required=False, help="Quantity to operate with", default=None, type=float)
     parser.add_argument("--usdt_amount", required=False, help="USDT amount to operate with. Will be translated into corresponding asset's quantity", default=None, type=float)
     parser.add_argument("--dry-run", action="store_true")
 
     args = parser.parse_args()
-
-    setup_logging(f"{args.symbol}_")
+    
+    out_directory_name = f"out/{datetime.now().strftime('%Y_%m_%d')}/trading/"
+    setup_logging(log_dir = out_directory_name, file_suffix=f"{args.symbol}_")
 
     logging.info(f"Script called with: {' '.join(sys.argv)}")
     logging.info(str(args))
@@ -29,7 +29,7 @@ if __name__ == "__main__":
         logging.error("Either quantity or usdt_amount have to be specified")
         exit(1)
 
-    out_directory_name = f"out/{datetime.now().strftime('%Y_%m_%d')}/trading/"
+    
 
     # Create the directory if it doesn't exist
     if not os.path.exists(out_directory_name):
