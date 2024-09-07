@@ -31,7 +31,7 @@ MFI_TRADING_TIMEOUT_H = 2 # default is 12, 2 is for testing
 
 VOL_THRESHOLD = 100e3
 
-ExchangeClient = Mexc("keys.yaml")
+ExchangeClient = Binance("keys.yaml")
 
 # Global termination flag
 termination_flag = multiprocessing.Value('i', 0)
