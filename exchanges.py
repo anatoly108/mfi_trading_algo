@@ -195,3 +195,6 @@ class Mexc(Exchange):
     
     def get_taker_fee_fraction(self):
         return 0.02/100
+
+    def get_order_book(self, symbol, limit=100):
+        return self.client.order_book(symbol=symbol, limit=limit)

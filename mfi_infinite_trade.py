@@ -28,7 +28,7 @@ if __name__ == "__main__":
     parser.add_argument("--config", required=True, help="Path to the YAML config file containing API keys")
     parser.add_argument("--usdt_amount", required=True, help="USDT amount to operate with. Will be translated into corresponding asset's quantity", type=float)
     parser.add_argument("--pnl_threshold", default=2, type=float)
-    parser.add_argument("--liq_threshold", default=0.2, type=float)
+    parser.add_argument("--liq_threshold", default=0, type=float)
     parser.add_argument("--n_assets_to_trade", default=3, type=int)
     parser.add_argument("--dry-run", action="store_true")
     parser.add_argument("--symbols", default=None, type=str)
@@ -48,6 +48,7 @@ if __name__ == "__main__":
     logging.info(f"Started infinite trade script")
     iteration = 0
     profits = []
+    profits_minus_fees = []
     total_profit = 0
     total_profit_minus_fees = 0
 
@@ -94,6 +95,10 @@ if __name__ == "__main__":
             # Wait for all futures to complete and gather results
             results = [future.result() for future in concurrent.futures.as_completed(futures)]
 
+        total_profit += np.sum([result["total_profit"] for result in results])
         total_profit_minus_fees += np.sum([result["total_profit_minus_fees"] for result in results])
-        logging.info(f"Total profit minus fees: {total_profit_minus_fees} USDT")
-        profits.append(total_profit_minus_fees)
+        logging.info(f"Total profit: {total_profit}, minus fees: {total_profit_minus_fees} USDT")
+        profits.append(total_profit)
+        profits_minus_fees.append(total_profit_minus_fees)
+        
+        iteration += 1
