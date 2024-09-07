@@ -14,20 +14,8 @@ import signal
 from multiprocessing import current_process, Manager
 from mfi_functions import setup_logging, calculate_mfi, \
                             find_extrema, plot_asset, get_candles, MFI_TIMEINTERVAL, \
-                            run_mfi_trading_algo, usd_to_quantity
+                            run_mfi_trading_algo, usd_to_quantity, termination_flag
 from mfi_analysis import mfi_analysis_main
-
-# Global variable to track if a termination signal was received
-termination_requested = False
-
-def signal_handler(signum, frame):
-    global termination_requested
-    logging.info(f"Received signal {signum}, setting termination flag.")
-    termination_requested = True
-
-# TODO: continue, use the Manager
-# Register signal handler for SIGTERM
-signal.signal(signal.SIGTERM, signal_handler)
 
 def run_mfi_trading_algo_wrapper(**kwargs):
     # wrapper to apply different logging in this subprocess/thread
@@ -61,8 +49,13 @@ if __name__ == "__main__":
     iteration = 0
     profits = []
     total_profit = 0
+    total_profit_minus_fees = 0
 
     while True:
+        if termination_flag.value:
+            logging.info(f"Termination flag is set, terminating")
+            break
+
         logging.info(f"Iteration {iteration}")
 
         # since it's "infinite", it will run for many days
@@ -88,14 +81,13 @@ if __name__ == "__main__":
         logging.info(f"Analysis finished, chosen assets: {chosen_assets}")
 
         with concurrent.futures.ProcessPoolExecutor() as executor:
-            # Submit the function with different arguments
             futures = []
             for asset in chosen_assets:
                 futures.append(executor.submit(run_mfi_trading_algo_wrapper, 
-                                               symbol=asset,
-                                               usdt_amount=args.usdt_amount,
-                                               dry_run=args.dry_run,
-                                               out_dir=out_directory_name))
+                                            symbol=asset,
+                                            usdt_amount=args.usdt_amount,
+                                            dry_run=args.dry_run,
+                                            out_dir=out_directory_name))
             
             logging.info(f"Waiting for results")
             

@@ -12,6 +12,8 @@ import yaml
 import time
 import sys
 from exchanges import Binance, Mexc
+import multiprocessing
+import signal
 from multiprocessing import current_process, Manager
 
 MFI_THRESHOLD_LOW = 20
@@ -28,6 +30,16 @@ MFI_TRADING_TIMEOUT_H = 2 # default is 12, 2 is for testing
 VOL_THRESHOLD = 100e3
 
 ExchangeClient = Binance("keys.yaml")
+
+# Global termination flag
+termination_flag = multiprocessing.Value('i', 0)
+
+# Signal handler to set the termination flag
+def signal_handler(sig, frame):
+    print(f"Signal {sig} received, setting termination flag")
+    termination_flag.value = 1
+
+signal.signal(signal.SIGTERM, signal_handler)
 
 def setup_logging(log_dir=None, file_suffix="", log_to_stdout=True):
     if log_dir is None:
@@ -241,9 +253,7 @@ def get_new_candles_from_exchange(symbol, interval, last_candle_timestamp):
 def run_mfi_trading_algo(symbol, dry_run, 
                          negative_cancel_num=3, get_new_candles_function=get_new_candles_from_exchange,
                          candles = None, exit_after_no_candle=False, do_plot=True, out_dir="out", 
-                         quantity=None, usdt_amount=None,
-                         termination_flag=None): 
-
+                         quantity=None, usdt_amount=None): 
     if quantity is None and usdt_amount is None:
         raise Exception("quantity is None and usdt_amount is None")
 
@@ -290,7 +300,7 @@ def run_mfi_trading_algo(symbol, dry_run,
             last_local_minima = mfi_i
     
     while True:
-        if termination_flag is not None and termination_flag.value and not bought:
+        if termination_flag.value and not bought:
             logging.info(f"Process {current_process().pid}: Termination requested, finishing up.")
             if bought:
                 logging.info("Termination requested, but not sold yet. Waiting for sell signal.")
