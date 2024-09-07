@@ -80,7 +80,7 @@ if __name__ == "__main__":
 
         logging.info(f"Analysis finished, chosen assets: {chosen_assets}")
 
-        with concurrent.futures.ProcessPoolExecutor() as executor:
+        with concurrent.futures.ProcessPoolExecutor(max_workers=args.n_assets_to_trade) as executor:
             futures = []
             for asset in chosen_assets:
                 futures.append(executor.submit(run_mfi_trading_algo_wrapper, 
