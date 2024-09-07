@@ -411,7 +411,7 @@ def run_mfi_trading_algo(symbol, dry_run,
             logging.info(f"Running time exceeded {MFI_TRADING_TIMEOUT_H} hours. Exiting.")
             break
 
-    total_profit_minus_fees = (len(buy_signals) + len(sell_signals))*usdt_amount_final*ExchangeClient.get_taker_fee_fraction()
+    total_profit_minus_fees = total_profit - (len(buy_signals) + len(sell_signals))*usdt_amount_final*ExchangeClient.get_taker_fee_fraction()
 
     logging.info(f"Finished. Total profit: {total_profit}, minus fees: {total_profit_minus_fees}")
 

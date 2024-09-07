@@ -6,6 +6,28 @@ import os
 import logging
 import numpy as np
 
+def retry_decorator(max_retries=3, delay=1):
+    """
+    A decorator to retry a function call in case of ConnectionError.
+    """
+    def decorator(func):
+        def wrapper(*args, **kwargs):
+            attempt = 0
+            while attempt < max_retries:
+                try:
+                    return func(*args, **kwargs)
+                except requests.exceptions.ConnectionError as e:
+                    logging.warning(f"Connection error: {e}. Retrying... {attempt + 1}/{max_retries}")
+                    attempt += 1
+                    time.sleep(delay)
+                except Exception as e:
+                    logging.error(f"An error occurred: {e}")
+                    raise e
+
+            raise Exception(f"Failed after {max_retries} attempts")
+        return wrapper
+    return decorator
+
 class Exchange(ABC):
     def __init__(self, config_path: str):
         if not os.path.exists(config_path):
@@ -29,22 +51,27 @@ class Exchange(ABC):
         self.execute_market_order_internal(symbol, side, quantity)
 
     # Abstract methods to be implemented by child classes
+    @retry_decorator(max_retries=3, delay=1)
     @abstractmethod
     def get_candles(self, symbol: str, interval: str, limit: int, startTime: int, endTime: int):
         pass
 
+    @retry_decorator(max_retries=3, delay=1)
     @abstractmethod
     def execute_market_order_internal(self, symbol: str, side: str, quantity: float):
         pass
 
+    @retry_decorator(max_retries=3, delay=1)
     @abstractmethod
     def get_ticker_data(self, symbol: str):
         pass
 
+    @retry_decorator(max_retries=3, delay=1)
     @abstractmethod
     def get_all_ticker_data(self):
         pass
 
+    @retry_decorator(max_retries=3, delay=1)
     @abstractmethod
     def get_all_spot_usdt_pairs(self):
         pass
@@ -53,6 +80,7 @@ class Exchange(ABC):
     def get_taker_fee_fraction(self):
         pass
 
+    @retry_decorator(max_retries=3, delay=1)
     @abstractmethod
     def calculate_liquidity_score(self, symbol: str, depth: int):
         pass
