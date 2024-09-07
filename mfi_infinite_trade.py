@@ -10,10 +10,24 @@ import argparse
 import os
 import time
 import concurrent.futures
+import signal
+from multiprocessing import current_process, Manager
 from mfi_functions import setup_logging, calculate_mfi, \
                             find_extrema, plot_asset, get_candles, MFI_TIMEINTERVAL, \
                             run_mfi_trading_algo, usd_to_quantity
 from mfi_analysis import mfi_analysis_main
+
+# Global variable to track if a termination signal was received
+termination_requested = False
+
+def signal_handler(signum, frame):
+    global termination_requested
+    logging.info(f"Received signal {signum}, setting termination flag.")
+    termination_requested = True
+
+# TODO: continue, use the Manager
+# Register signal handler for SIGTERM
+signal.signal(signal.SIGTERM, signal_handler)
 
 def run_mfi_trading_algo_wrapper(**kwargs):
     # wrapper to apply different logging in this subprocess/thread

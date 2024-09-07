@@ -12,6 +12,7 @@ import yaml
 import time
 import sys
 from exchanges import Binance, Mexc
+from multiprocessing import current_process, Manager
 
 MFI_THRESHOLD_LOW = 20
 MFI_THRESHOLD_LOW_EXTENDED = MFI_THRESHOLD_LOW + 10
@@ -38,6 +39,10 @@ def setup_logging(log_dir=None, file_suffix="", log_to_stdout=True):
     log_filename = f"{file_suffix}{datetime.now().strftime('%Y_%m_%d_%H_%M_%S')}.txt"
     log_filepath = os.path.join(log_dir, log_filename)
 
+    # Clear existing logging handlers to prevent inheritance issues
+    for handler in logging.root.handlers[:]:
+        logging.root.removeHandler(handler)
+
     handlers = [logging.FileHandler(log_filepath)]  # Log to file by default
 
     if log_to_stdout:
@@ -59,8 +64,6 @@ def setup_logging(log_dir=None, file_suffix="", log_to_stdout=True):
 
     # Set the custom exception hook as the global one
     sys.excepthook = log_exception
-
-
 
 def usd_to_quantity(usdt_amount, current_price):
     return(round(usdt_amount / current_price))
@@ -237,7 +240,9 @@ def get_new_candles_from_exchange(symbol, interval, last_candle_timestamp):
 
 def run_mfi_trading_algo(symbol, dry_run, 
                          negative_cancel_num=3, get_new_candles_function=get_new_candles_from_exchange,
-                         candles = None, exit_after_no_candle=False, do_plot=True, out_dir="out", quantity=None, usdt_amount=None): 
+                         candles = None, exit_after_no_candle=False, do_plot=True, out_dir="out", 
+                         quantity=None, usdt_amount=None,
+                         termination_flag=None): 
 
     if quantity is None and usdt_amount is None:
         raise Exception("quantity is None and usdt_amount is None")
@@ -285,6 +290,14 @@ def run_mfi_trading_algo(symbol, dry_run,
             last_local_minima = mfi_i
     
     while True:
+        if termination_flag is not None and termination_flag.value and not bought:
+            logging.info(f"Process {current_process().pid}: Termination requested, finishing up.")
+            if bought:
+                logging.info("Termination requested, but not sold yet. Waiting for sell signal.")
+            else:
+                logging.info("Termination requested, not bought. Breaking.")
+                break
+
         iteration += 1
 
         # Recalculate MFI with the new candle(s)
