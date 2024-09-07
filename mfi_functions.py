@@ -16,6 +16,7 @@ import sys
 from exchanges import Binance, Mexc
 import multiprocessing
 import signal
+from pycoingecko import CoinGeckoAPI
 from multiprocessing import current_process, Manager
 
 MFI_THRESHOLD_LOW = 20
@@ -35,6 +36,9 @@ ExchangeClient = Binance("keys.yaml")
 
 # Global termination flag
 termination_flag = multiprocessing.Value('i', 0)
+
+cg_coins_list = None
+btc_liquidity_score_raw = None
 
 # Signal handler to set the termination flag
 def signal_handler(sig, frame):
@@ -78,6 +82,56 @@ def setup_logging(log_dir=None, file_suffix="", log_to_stdout=True):
 
     # Set the custom exception hook as the global one
     sys.excepthook = log_exception
+
+def get_coin_id_from_USDT_pair(pair):
+    # Remove "USDT" (quote asset) to get the base asset
+    base_asset = pair.replace('USDT', '').lower()
+    # Find matching coin_id based on the base asset symbol
+    return(next((coin["id"] for coin in cg_coins_list if coin['symbol'].lower() == base_asset), None))
+
+def calculate_liquidity_score(symbol, keep_raw=False, skip_setup=True):
+    global btc_liquidity_score_raw
+    if btc_liquidity_score_raw is None and not skip_setup:
+        # use BTC as the thing with highest liquidity
+        btc_liquidity_score_raw = calculate_liquidity_score(symbol="BTCUSDT", keep_raw=True, skip_setup=False)
+
+    # coin_id = get_coin_id_from_USDT_pair(symbol)
+    # if coin_id is None:
+    #     return 0
+
+    # Step 1: Get 24-hour ticker for trading volume
+    ticker = ExchangeClient.get_ticker_data(symbol=symbol)
+    trading_volume = float(ticker['quoteVolume'])  # This is the trading volume in USDT
+
+    # Step 2: Calculate Market Capitalization
+    price = float(ticker['lastPrice'])  # Current price of the coin
+    # cg = CoinGeckoAPI()
+    # coin_data = cg.get_coin_by_id(coin_id)
+    # circulating_supply = coin_data['market_data']['circulating_supply']
+    # market_cap = price * circulating_supply  # Market capitalization
+
+    # Step 3: Calculate Order Book Depth (using 5% of the price range as an example)
+    order_book = ExchangeClient.get_order_book(symbol=symbol, limit=200)
+    bids = sum(float(bid[1]) for bid in order_book['bids'])  # Summing the volumes of buy orders
+    asks = sum(float(ask[1]) for ask in order_book['asks'])  # Summing the volumes of sell orders
+    order_book_depth = bids + asks  # Total order book depth
+
+    # Step 4: Calculate Bid-Ask Spread
+    best_bid = float(order_book['bids'][0][0])
+    best_ask = float(order_book['asks'][0][0])
+    bid_ask_spread = (best_ask - best_bid) / best_bid * 100  # Bid-ask spread in percentage
+
+    # Step 5: Calculate Liquidity Score
+    liquidity_score = (0.3 * trading_volume) + (0.5 * order_book_depth) + (0.2 * (1 / (1 + bid_ask_spread)))
+    # original formula with market cap:
+    # liquidity_score = (0.4 * trading_volume) + (0.3 * market_cap) + (0.1 * order_book_depth) + (0.2 * (1 / (1 + bid_ask_spread)))
+
+    # Step 6: Normalization (optional, for a max score of 100)
+    if keep_raw:
+        return liquidity_score
+    
+    normalized_score = (liquidity_score / btc_liquidity_score_raw) * 100
+    return normalized_score
 
 def usd_to_quantity(usdt_amount, current_price):
     return(round(usdt_amount / current_price))
