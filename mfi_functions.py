@@ -300,7 +300,7 @@ def run_mfi_trading_algo(symbol, dry_run,
             last_local_minima = mfi_i
     
     while True:
-        if termination_flag.value and not bought:
+        if termination_flag.value:
             logging.info(f"Process {current_process().pid}: Termination requested, finishing up.")
             if bought:
                 logging.info("Termination requested, but not sold yet. Waiting for sell signal.")
