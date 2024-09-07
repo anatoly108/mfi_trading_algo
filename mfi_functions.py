@@ -6,6 +6,8 @@ import logging
 from datetime import datetime, timedelta, timezone
 from scipy.signal import find_peaks
 import os
+import matplotlib
+matplotlib.use('Agg')  # Use Agg backend for rendering without a display
 import matplotlib.pyplot as plt
 import mplfinance as mpf
 import yaml
