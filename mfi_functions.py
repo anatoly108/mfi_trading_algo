@@ -16,7 +16,6 @@ import sys
 from exchanges import Binance, Mexc
 import multiprocessing
 import signal
-from pycoingecko import CoinGeckoAPI
 from multiprocessing import current_process, Manager
 
 MFI_THRESHOLD_LOW = 20
@@ -32,7 +31,7 @@ MFI_TRADING_TIMEOUT_H = 2 # default is 12, 2 is for testing
 
 VOL_THRESHOLD = 100e3
 
-ExchangeClient = Binance("keys.yaml")
+ExchangeClient = Mexc("keys.yaml")
 
 # Global termination flag
 termination_flag = multiprocessing.Value('i', 0)
