@@ -10,7 +10,8 @@ import argparse
 import os
 from mfi_functions import setup_logging, calculate_mfi, \
                             find_extrema, plot_asset, get_candles, MFI_TIMEINTERVAL, \
-                            run_mfi_trading_algo, usd_to_quantity, ExchangeClient, VOL_THRESHOLD
+                            run_mfi_trading_algo, usd_to_quantity, ExchangeClient, VOL_THRESHOLD, \
+                            calculate_liquidity_score
 
 def convert_to_millions(volume):
     # Convert the volume to millions
@@ -65,7 +66,7 @@ def analyze_pair(ticker_data):
 
     asset_price_change = round((1 - candles[0][4]/candles[-1][4]) * 100, 1)
 
-    liquidity_score = ExchangeClient.calculate_liquidity_score(symbol)
+    liquidity_score = calculate_liquidity_score(symbol)
 
     result_dict = {
         "symbol": symbol,

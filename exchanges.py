@@ -86,10 +86,6 @@ class Exchange(metaclass=RetryMeta):
         pass
 
     @abstractmethod
-    def calculate_liquidity_score(self, symbol: str, depth: int):
-        pass
-
-    @abstractmethod
     def get_order_book(self, symbol, limit=100):
         pass
 
@@ -199,6 +195,3 @@ class Mexc(Exchange):
     
     def get_taker_fee_fraction(self):
         return 0.02/100
-
-    def calculate_liquidity_score(self, symbol: str, depth=5):
-        raise Exception("Not implemented")
