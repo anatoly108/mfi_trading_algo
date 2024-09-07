@@ -5,6 +5,8 @@ from pymexc import spot
 import os
 import logging
 import numpy as np
+import requests
+import time
 
 def retry_decorator(max_retries=3, delay=1):
     """
@@ -16,8 +18,8 @@ def retry_decorator(max_retries=3, delay=1):
             while attempt < max_retries:
                 try:
                     return func(*args, **kwargs)
-                except requests.exceptions.ConnectionError as e:
-                    logging.warning(f"Connection error: {e}. Retrying... {attempt + 1}/{max_retries}")
+                except (requests.exceptions.ConnectionError, requests.exceptions.ReadTimeout) as e:
+                    logging.warning(f"{func.__name__} {e.__class__.__name__}: {e}. Retrying... {attempt + 1}/{max_retries}")
                     attempt += 1
                     time.sleep(delay)
                 except Exception as e:
@@ -28,7 +30,15 @@ def retry_decorator(max_retries=3, delay=1):
         return wrapper
     return decorator
 
-class Exchange(ABC):
+# Metaclass to automatically apply the decorator
+class RetryMeta(type):
+    def __new__(cls, name, bases, dct):
+        for attr, value in dct.items():
+            if callable(value) and not attr.startswith('__'):
+                dct[attr] = retry_decorator()(value)
+        return super().__new__(cls, name, bases, dct)
+
+class Exchange(metaclass=RetryMeta):
     def __init__(self, config_path: str):
         if not os.path.exists(config_path):
             self.api_key = None
@@ -51,27 +61,22 @@ class Exchange(ABC):
         self.execute_market_order_internal(symbol, side, quantity)
 
     # Abstract methods to be implemented by child classes
-    @retry_decorator(max_retries=3, delay=1)
     @abstractmethod
     def get_candles(self, symbol: str, interval: str, limit: int, startTime: int, endTime: int):
         pass
 
-    @retry_decorator(max_retries=3, delay=1)
     @abstractmethod
     def execute_market_order_internal(self, symbol: str, side: str, quantity: float):
         pass
 
-    @retry_decorator(max_retries=3, delay=1)
     @abstractmethod
     def get_ticker_data(self, symbol: str):
         pass
 
-    @retry_decorator(max_retries=3, delay=1)
     @abstractmethod
     def get_all_ticker_data(self):
         pass
 
-    @retry_decorator(max_retries=3, delay=1)
     @abstractmethod
     def get_all_spot_usdt_pairs(self):
         pass
@@ -80,7 +85,6 @@ class Exchange(ABC):
     def get_taker_fee_fraction(self):
         pass
 
-    @retry_decorator(max_retries=3, delay=1)
     @abstractmethod
     def calculate_liquidity_score(self, symbol: str, depth: int):
         pass
@@ -89,10 +93,9 @@ class Exchange(ABC):
 class Binance(Exchange):
     def __init__(self, config_path: str):
         super().__init__(config_path)
-        self.client = BinanceClient(self.api_key, self.api_secret)
     
     def get_candles(self, symbol: str, interval: str, limit: int, startTime: int, endTime: int):
-        candles = self.client.get_klines(symbol=symbol, interval=interval, limit=limit, startTime=startTime, endTime=endTime)
+        candles = BinanceClient(self.api_key, self.api_secret).get_klines(symbol=symbol, interval=interval, limit=limit, startTime=startTime, endTime=endTime)
         # time, open, high, low, close, volume
         formatted_candles = [
             [int(candle[0]), float(candle[1]), float(candle[2]), float(candle[3]), float(candle[4]), float(candle[5])]
@@ -102,9 +105,9 @@ class Binance(Exchange):
 
     def execute_market_order_internal(self, symbol: str, side: str, quantity: float):
         if side.upper() == "BUY":
-            order = self.client.order_market_buy(symbol=symbol, quantity=quantity)
+            order = BinanceClient(self.api_key, self.api_secret).order_market_buy(symbol=symbol, quantity=quantity)
         elif side.upper() == "SELL":
-            order = self.client.order_market_sell(symbol=symbol, quantity=quantity)
+            order = BinanceClient(self.api_key, self.api_secret).order_market_sell(symbol=symbol, quantity=quantity)
         else:
             raise ValueError("Side must be either 'BUY' or 'SELL'")
         
@@ -115,10 +118,10 @@ class Binance(Exchange):
         return {'price': final_price, 'order_obj': order}
     
     def get_ticker_data(self, symbol: str):
-        return(self.client.get_ticker(symbol=symbol, type="MINI"))
+        return(BinanceClient(self.api_key, self.api_secret).get_ticker(symbol=symbol, type="MINI"))
 
     def get_all_spot_usdt_pairs(self):
-        exchange_info = self.client.get_exchange_info()
+        exchange_info = BinanceClient(self.api_key, self.api_secret).get_exchange_info()
         usdt_pairs = [
             symbol['symbol'] for symbol in exchange_info['symbols']
             if symbol['symbol'].endswith('USDT') and symbol['status'] == 'TRADING' and symbol['isSpotTradingAllowed']
@@ -129,7 +132,7 @@ class Binance(Exchange):
         return 0.075/100
 
     def get_all_ticker_data(self):
-        return self.client.get_ticker(type="MINI")
+        return BinanceClient(self.api_key, self.api_secret).get_ticker(type="MINI")
 
     def calculate_liquidity_score(self, symbol, depth=200):
         """
@@ -143,7 +146,7 @@ class Binance(Exchange):
             float: Liquidity score from 0 to 1, where 1 is highly liquid and 0 is illiquid.
         """
         # Get the order book for the symbol
-        order_book = self.client.get_order_book(symbol=symbol, limit=depth)
+        order_book = BinanceClient(self.api_key, self.api_secret).get_order_book(symbol=symbol, limit=depth)
 
         # Access top bids and asks
         bids = order_book['bids']  # List of [price, quantity]
