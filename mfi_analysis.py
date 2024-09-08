@@ -8,6 +8,7 @@ from tqdm import tqdm
 from scipy.signal import find_peaks
 import argparse
 import os
+import concurrent.futures
 from mfi_functions import setup_logging, calculate_mfi, \
                             find_extrema, plot_asset, get_candles, MFI_TIMEINTERVAL, \
                             run_mfi_trading_algo, usd_to_quantity, ExchangeClient, VOL_THRESHOLD, \
@@ -91,7 +92,7 @@ def analyze_pair(ticker_data):
     return result_dict
 
 
-def mfi_analysis_main(plot_all=False, short=False, symbols=None, no_vol_threshold=False, vol_threshold=VOL_THRESHOLD):
+def mfi_analysis_main(plot_all=False, short=False, symbols=None, no_vol_threshold=False, vol_threshold=VOL_THRESHOLD, max_workers=os.cpu_count()):
     # Filter symbols that end with 'USDT' and are available for spot trading
     if symbols is None:
         symbols = ExchangeClient.get_all_spot_usdt_pairs()
@@ -112,10 +113,19 @@ def mfi_analysis_main(plot_all=False, short=False, symbols=None, no_vol_threshol
 
     print("running analysis")
     results = []
-    for ticker in tqdm(tickers_final):
-        result = analyze_pair(ticker)
-        if result:
-            results.append(result)
+    with concurrent.futures.ProcessPoolExecutor(max_workers=max_workers) as executor:
+        futures = []
+        for ticker in tickers_final:
+            futures.append(executor.submit(analyze_pair, 
+                                           ticker_data=ticker))
+        
+        # Wait for all futures to complete and gather results
+        results = [future.result() for future in concurrent.futures.as_completed(futures)]
+
+        for future in tqdm(futures):
+            result = future.result()
+            if result:
+                results.append(result)
     
     subset_results = [
     {

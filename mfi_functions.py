@@ -211,10 +211,6 @@ def get_candles(symbol, interval, startTime=None, endTime=None):
         # Move startTime forward to the last candle's timestamp + 1ms to avoid overlapping
         last_candle_time = candles[-1][0]
         startTimeUnix = last_candle_time + 1
-        
-        # To break if all possible candles were returned
-        if len(candles) < limit:
-            break
     
     # Sort all candles by timestamp to ensure correct order
     all_candles = sorted(all_candles, key=lambda x: x[0])
