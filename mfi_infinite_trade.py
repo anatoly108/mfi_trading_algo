@@ -15,7 +15,8 @@ import sys
 from multiprocessing import current_process, Manager
 from mfi_functions import setup_logging, calculate_mfi, \
                             find_extrema, plot_asset, get_candles, MFI_TIMEINTERVAL, \
-                            run_mfi_trading_algo, usd_to_quantity, termination_flag, get_exchange_client
+                            run_mfi_trading_algo, usd_to_quantity, termination_flag, get_exchange_client, \
+                            write_trading_results
 from mfi_analysis import mfi_analysis_main
 
 def run_mfi_trading_algo_wrapper(**kwargs):
@@ -44,6 +45,9 @@ if __name__ == "__main__":
     out_directory_name = f"out/{datetime.now().strftime('%Y_%m_%d')}/trading/"
     if not os.path.exists(out_directory_name):
         os.makedirs(out_directory_name)
+
+    global_results_csv = f"out/{datetime.now().strftime('%Y_%m_%d_%H_%M_%S')}_infinite_trade_results.csv"
+    global_trades_csv = f"out/{datetime.now().strftime('%Y_%m_%d_%H_%M_%S')}_infinite_trade_trades.csv"
 
     setup_logging(log_dir=out_directory_name, file_suffix=f"infinite_trade")
     logging.info(f"Script called with: {' '.join(sys.argv)}")
@@ -109,5 +113,12 @@ if __name__ == "__main__":
         logging.info(f"Total profit: {total_profit}, minus fees: {total_profit_minus_fees} USDT")
         profits.append(total_profit)
         profits_minus_fees.append(total_profit_minus_fees)
+
+        logging.info(f"Writing results to file")
+        write_trading_results(results=results,
+                              global_results_csv=global_results_csv,
+                              global_trades_csv=global_trades_csv,
+                              additional_values_to_add={"iteration": iteration,
+                                                        "exchange": exchange_client.__class__.__name__})
         
         iteration += 1

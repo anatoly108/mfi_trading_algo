@@ -296,6 +296,71 @@ def get_new_candles_from_exchange(symbol, interval, last_candle_timestamp, excha
                         startTime=datetime.fromtimestamp(last_candle_timestamp/1000, tz=timezone.utc) - timedelta(minutes=10), 
                         endTime=get_last_complete_time_for_candles(interval)))
 
+def write_trading_results(results, global_results_csv, global_trades_csv, additional_values_to_add={}):
+    keys_to_extract = ['symbol', 'total_profit', "total_profit_minus_fees"]
+    result_dicts_for_data_frame = []
+    for result in results:
+        # Subset using dictionary comprehension
+        result_sub = {key: result[key] for key in keys_to_extract if key in result}
+        result_sub.update(additional_values_to_add)
+        result_sub["date_start"] = result["candles"][0][0]
+        result_sub["date_end"] = result["candles"][-1][0]
+        result_dicts_for_data_frame.append(result_sub)
+
+    results_df = pd.DataFrame.from_dict(result_dicts_for_data_frame)
+    if os.path.exists(global_results_csv):
+        header = False
+    else:
+        header = True
+    results_df.to_csv(global_results_csv, mode="a", header=header, index=False)
+
+    logging.info(f"Writing individual trades to files")
+    trades = []
+    for result in results:
+        
+        for i in range(len(result["buy_signals"])):
+            buy_signal = result["buy_signals"][i]
+            if len(result["sell_signals"]) < i + 1:
+                # buy without sell - can happen in analysis
+                break 
+
+            sell_signal = result["sell_signals"][i]
+            
+            mfi_i_buy = result["mfi"][buy_signal]
+            mfi_i_sell = result["mfi"][sell_signal]
+
+            profit = result["profits"][i]
+
+            candle_buy = result["candles"][buy_signal]
+            candle_buy_time = candle_buy[0]
+            candle_buy_close = candle_buy[4]
+            candle_sell = result["candles"][sell_signal]
+            candle_sell_time = candle_sell[0]
+            candle_sell_close = candle_sell[4]
+
+            trade_dict = {
+                "symbol": result["symbol"],
+                "i": i,
+                "buy_signal": buy_signal,
+                "sell_signal": sell_signal,
+                "mfi_i_buy": mfi_i_buy,
+                "mfi_i_sell": mfi_i_sell,
+                "profit": profit,
+                "candle_buy_time": candle_buy_time,
+                "candle_buy_close": candle_buy_close,
+                "candle_sell_time": candle_sell_time,
+                "candle_sell_close": candle_sell_close
+            }
+            trade_dict.update(additional_values_to_add)
+            trades.append(trade_dict)
+    
+    trades_df = pd.DataFrame.from_dict(trades)
+    if os.path.exists(global_trades_csv):
+        header = False
+    else:
+        header = True
+    trades_df.to_csv(global_trades_csv, mode="a", header=header, index=False)
+
 def run_mfi_trading_algo(symbol, dry_run, exchange_client,
                          negative_cancel_num=3, get_new_candles_function=get_new_candles_from_exchange,
                          candles = None, exit_after_no_candle=False, do_plot=True, out_dir="out", 
@@ -484,7 +549,7 @@ def run_mfi_trading_algo(symbol, dry_run, exchange_client,
 
     logging.info(f"Finished. Total profit: {total_profit}, minus fees: {total_profit_minus_fees}")
 
-    return({
+    res_dict = {
             "symbol": symbol,
             "candles": candles,
             "mfi": mfi,
@@ -493,5 +558,7 @@ def run_mfi_trading_algo(symbol, dry_run, exchange_client,
             "total_profit": total_profit,
             "total_profit_minus_fees": total_profit_minus_fees,
             "profits": profits
-        })
+        }
+
+    return(res_dict)
 

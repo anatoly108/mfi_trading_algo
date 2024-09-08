@@ -11,7 +11,7 @@ import os
 from mfi_functions import setup_logging, calculate_mfi, \
                             find_extrema, plot_asset, get_candles, MFI_TIMEINTERVAL, \
                             run_mfi_trading_algo, usd_to_quantity, VOL_THRESHOLD, \
-                            calculate_liquidity_score, get_exchange_client
+                            calculate_liquidity_score, get_exchange_client, write_trading_results
 
 def convert_to_millions(volume):
     # Convert the volume to millions
@@ -75,6 +75,7 @@ def analyze_pair(ticker_data, exchange_client):
         "mfi": mfi,
         "buy_signals": buy_signals,
         "sell_signals": sell_signals,
+        "profits": trading_results["profits"],
         "total_profit": round(trading_results["total_profit"], 1),
         "total_profit_minus_fees": round(total_profit_minus_fees, 1),
         "fees": fees,
@@ -117,7 +118,7 @@ def mfi_analysis_main(exchange_client, plot_all=False, short=False, symbols=None
         result = analyze_pair(ticker_data=ticker, exchange_client=exchange_client)
         if result:
             results.append(result)
-    
+            
     subset_results = [
     {
         "symbol": res["symbol"],
@@ -148,6 +149,11 @@ def mfi_analysis_main(exchange_client, plot_all=False, short=False, symbols=None
     df.to_csv(f"{out_directory_name}/{filename_suffix}_{exchange_client.__class__.__name__}_crypto_mfi_analysis.csv", index=False)
     df.to_excel(f"{out_directory_name}/{filename_suffix}_{exchange_client.__class__.__name__}_crypto_mfi_analysis.xlsx", index=False)
 
+    write_trading_results(results=results,
+                        global_results_csv=f"{out_directory_name}/{filename_suffix}_{exchange_client.__class__.__name__}_crypto_mfi_analysis_results.csv",
+                        global_trades_csv=f"{out_directory_name}/{filename_suffix}_{exchange_client.__class__.__name__}_crypto_mfi_analysis_trades.csv",
+                        additional_values_to_add={"exchange": exchange_client.__class__.__name__})
+                            
     # Select top 10 assets based on highest total_profit
     top_assets = df[0:min([9, df.shape[0]])]
     flop_assets = df[-min([10, df.shape[0]]):]
