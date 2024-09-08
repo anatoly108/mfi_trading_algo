@@ -10,8 +10,8 @@ import argparse
 import os
 from mfi_functions import setup_logging, calculate_mfi, \
                             find_extrema, plot_asset, get_candles, MFI_TIMEINTERVAL, \
-                            run_mfi_trading_algo, usd_to_quantity, ExchangeClient, VOL_THRESHOLD, \
-                            calculate_liquidity_score, set_exchange
+                            run_mfi_trading_algo, usd_to_quantity, VOL_THRESHOLD, \
+                            calculate_liquidity_score, get_exchange_client
 
 def convert_to_millions(volume):
     # Convert the volume to millions
@@ -26,9 +26,9 @@ def convert_to_millions(volume):
         return f"{volume_in_millions:.1f}M"
 
 
-def analyze_pair(ticker_data):
+def analyze_pair(ticker_data, exchange_client):
     symbol = ticker_data["symbol"]
-    candles = get_candles(symbol, "1m")
+    candles = get_candles(symbol=symbol, interval="1m", exchange_client=exchange_client)
     if len(candles) == 0:
         return None
     
@@ -42,7 +42,7 @@ def analyze_pair(ticker_data):
     candles_part1 = candles[:part1_of_candles_num]
     candles_part2 = candles[part2_of_candles_num:]
     # just get the next candle from candles_part2
-    get_new_candles_for_analysis = lambda symbol, interval, last_candle_timestamp: next(
+    get_new_candles_for_analysis = lambda symbol, interval, last_candle_timestamp, exchange_client: next(
         ([candle] for candle in candles_part2 if candle[0] > last_candle_timestamp), 
         []
     )
@@ -51,6 +51,7 @@ def analyze_pair(ticker_data):
     quantity = usd_to_quantity(usdt, candles[-1][4]) # latest close price to figure out quantity, assume $1k trades
     trading_results = run_mfi_trading_algo(symbol = symbol, 
                                            quantity = quantity, 
+                                           exchange_client = exchange_client,
                                            dry_run = True,
                                            candles = candles_part1,
                                            get_new_candles_function = get_new_candles_for_analysis,
@@ -60,13 +61,13 @@ def analyze_pair(ticker_data):
     sell_signals = trading_results["sell_signals"]
 
     trades_num = len(buy_signals) * 2
-    fee_per_trade = ExchangeClient.get_taker_fee_fraction()
+    fee_per_trade = exchange_client.get_taker_fee_fraction()
     fees = fee_per_trade*trades_num*usdt
     total_profit_minus_fees = trading_results["total_profit"] - fees
 
     asset_price_change = round((1 - candles[0][4]/candles[-1][4]) * 100, 1)
 
-    liquidity_score = calculate_liquidity_score(symbol)
+    liquidity_score = calculate_liquidity_score(symbol=symbol, exchange_client=exchange_client)
 
     result_dict = {
         "symbol": symbol,
@@ -91,14 +92,14 @@ def analyze_pair(ticker_data):
     return result_dict
 
 
-def mfi_analysis_main(plot_all=False, short=False, symbols=None, no_vol_threshold=False, vol_threshold=VOL_THRESHOLD):
+def mfi_analysis_main(exchange_client, plot_all=False, short=False, symbols=None, no_vol_threshold=False, vol_threshold=VOL_THRESHOLD):
     # Filter symbols that end with 'USDT' and are available for spot trading
     if symbols is None:
-        symbols = ExchangeClient.get_all_spot_usdt_pairs()
+        symbols = exchange_client.get_all_spot_usdt_pairs()
     # for testing specific symbols
     # symbols = ["AUDIOUSDT"]
     
-    tickers = ExchangeClient.get_all_ticker_data()
+    tickers = exchange_client.get_all_ticker_data()
     tickers_final = []
 
     for symbol in symbols:
@@ -113,7 +114,7 @@ def mfi_analysis_main(plot_all=False, short=False, symbols=None, no_vol_threshol
     print("running analysis")
     results = []
     for ticker in tqdm(tickers_final):
-        result = analyze_pair(ticker)
+        result = analyze_pair(ticker_data=ticker, exchange_client=exchange_client)
         if result:
             results.append(result)
     
@@ -138,14 +139,14 @@ def mfi_analysis_main(plot_all=False, short=False, symbols=None, no_vol_threshol
     df = df.sort_values(by='total_profit', ascending=False)
 
     filename_suffix = datetime.now().strftime('%Y_%m_%d_%H_%M_%S')
-    out_directory_name = f"out/{datetime.now().strftime('%Y_%m_%d')}/analysis/{filename_suffix}_{ExchangeClient.__class__.__name__}"
+    out_directory_name = f"out/{datetime.now().strftime('%Y_%m_%d')}/analysis/{filename_suffix}_{exchange_client.__class__.__name__}"
 
     # Create the directory if it doesn't exist
     if not os.path.exists(out_directory_name):
         os.makedirs(out_directory_name)
     
-    df.to_csv(f"{out_directory_name}/{filename_suffix}_{ExchangeClient.__class__.__name__}_crypto_mfi_analysis.csv", index=False)
-    df.to_excel(f"{out_directory_name}/{filename_suffix}_{ExchangeClient.__class__.__name__}_crypto_mfi_analysis.xlsx", index=False)
+    df.to_csv(f"{out_directory_name}/{filename_suffix}_{exchange_client.__class__.__name__}_crypto_mfi_analysis.csv", index=False)
+    df.to_excel(f"{out_directory_name}/{filename_suffix}_{exchange_client.__class__.__name__}_crypto_mfi_analysis.xlsx", index=False)
 
     # Select top 10 assets based on highest total_profit
     top_assets = df[0:min([9, df.shape[0]])]
@@ -176,8 +177,9 @@ if __name__ == "__main__":
     parser.add_argument("--exchange", required=False, default="binance")
     args = parser.parse_args()
 
-    set_exchange(args.exchange)
+    exchange_client = get_exchange_client(args.exchange)
 
-    mfi_analysis_main(plot_all=args.plot_all, 
+    mfi_analysis_main(exchange_client=exchange_client,
+                      plot_all=args.plot_all, 
                       no_vol_threshold=args.no_vol_threshold, 
                       vol_threshold=args.vol_threshold)

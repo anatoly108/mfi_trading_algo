@@ -8,7 +8,7 @@ import talib as ta
 import numpy as np
 import requests
 import sys
-from mfi_functions import setup_logging, run_mfi_trading_algo, usd_to_quantity, set_exchange
+from mfi_functions import setup_logging, run_mfi_trading_algo, usd_to_quantity, get_exchange_client
 
 if __name__ == "__main__":
     parser = argparse.ArgumentParser(description="")
@@ -19,8 +19,6 @@ if __name__ == "__main__":
     parser.add_argument("--exchange", required=False, default="binance")
 
     args = parser.parse_args()
-    
-    set_exchange(args.exchange)
 
     out_directory_name = f"out/{datetime.now().strftime('%Y_%m_%d')}/trading/"
     setup_logging(log_dir = out_directory_name, file_suffix=f"{args.symbol}_")
@@ -28,18 +26,19 @@ if __name__ == "__main__":
     logging.info(f"Script called with: {' '.join(sys.argv)}")
     logging.info(str(args))
 
+    exchange_client = get_exchange_client(args.exchange)
+
     if args.quantity is None and args.usdt_amount is None:
         logging.error("Either quantity or usdt_amount have to be specified")
         exit(1)
-
     
-
     # Create the directory if it doesn't exist
     if not os.path.exists(out_directory_name):
         os.makedirs(out_directory_name)
 
     run_mfi_trading_algo(symbol=args.symbol, 
                          quantity=args.quantity, 
+                         exchange_client=exchange_client,
                          usdt_amount=args.quantity, 
                          dry_run=args.dry_run, 
                          out_dir=out_directory_name)

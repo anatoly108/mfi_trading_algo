@@ -31,8 +31,6 @@ MFI_TRADING_TIMEOUT_H = 6 # default is 12, 2 is for testing
 
 VOL_THRESHOLD = 100e3
 
-ExchangeClient = None
-
 # Global termination flag
 termination_flag = multiprocessing.Value('i', 0)
 
@@ -81,32 +79,32 @@ def setup_logging(log_dir=None, file_suffix="", log_to_stdout=True):
     # Set the custom exception hook as the global one
     sys.excepthook = log_exception
 
-def set_exchange(exchange_name):
-    global ExchangeClient
+def get_exchange_client(exchange_name):
     if exchange_name == "binance":
-        ExchangeClient = Binance("keys.yaml")
+        exchange_client = Binance("keys.yaml")
     elif exchange_name == "mexc":
-        ExchangeClient = Mexc("keys.yaml")
+        exchange_client = Mexc("keys.yaml")
     else:
         raise Exception(f"Incorrect exchange: {exchange_name}")
 
-    logging.info(f"Exchange is set to: {ExchangeClient.__class__.__name__}")
+    logging.info(f"Exchange is set to: {exchange_client.__class__.__name__}")
+    return exchange_client
 
-def calculate_liquidity_score(symbol, is_setup=False):
+def calculate_liquidity_score(symbol, exchange_client, is_setup=False):
     global btc_liquidity_score_raw
     if btc_liquidity_score_raw is None and not is_setup:
         # use BTC as the thing with highest liquidity
-        btc_liquidity_score_raw = calculate_liquidity_score(symbol="BTCUSDT", is_setup=True)
+        btc_liquidity_score_raw = calculate_liquidity_score(symbol="BTCUSDT", exchange_client=exchange_client, is_setup=True)
 
     # Step 1: Get 24-hour ticker for trading volume
-    ticker = ExchangeClient.get_ticker_data(symbol=symbol)
+    ticker = exchange_client.get_ticker_data(symbol=symbol)
     trading_volume = float(ticker['quoteVolume'])  # This is the trading volume in USDT
 
     # Step 2: Calculate Market Capitalization
     # not available at the moment
 
     # Step 3: Calculate Order Book Depth (using 5% of the price range as an example)
-    order_book = ExchangeClient.get_order_book(symbol=symbol, limit=200)
+    order_book = exchange_client.get_order_book(symbol=symbol, limit=200)
     bids = sum(float(bid[1]) for bid in order_book['bids'])  # Summing the volumes of buy orders
     asks = sum(float(ask[1]) for ask in order_book['asks'])  # Summing the volumes of sell orders
     order_book_depth = bids + asks  # Total order book depth
@@ -192,7 +190,7 @@ def calculate_num_candles(interval, startTime, endTime):
 
 # note: this will return only complete candles!
 # startTime and endTime are datetime objects, easiest way to specify: datetime.strptime("2024-01-01 00:00:00", "%Y-%m-%d %H:%M:%S")
-def get_candles(symbol, interval, startTime=None, endTime=None):
+def get_candles(symbol, interval, exchange_client, startTime=None, endTime=None):
     all_candles = []
     limit = 1000  # Maximum allowed by Binance
 
@@ -208,7 +206,7 @@ def get_candles(symbol, interval, startTime=None, endTime=None):
 
     while len(all_candles) < num_candles:
         current_limit = min(limit, num_candles - len(all_candles))
-        candles = ExchangeClient.get_candles(symbol=symbol,
+        candles = exchange_client.get_candles(symbol=symbol,
                                              interval=interval,
                                              startTime=startTimeUnix,
                                              endTime=endTimeUnix,
@@ -288,23 +286,24 @@ def plot_asset(asset_data, plot_suffix="", out_dir="out"):
     plt.close()
 
 
-def get_new_candles_from_exchange(symbol, interval, last_candle_timestamp):
+def get_new_candles_from_exchange(symbol, interval, last_candle_timestamp, exchange_client):
     # Sleep for 60 seconds before fetching new data
     time.sleep(60)
     # get many candles just to be sure we didn't miss any due to some glitch
     return(get_candles(symbol=symbol, 
                         interval="1m", 
+                        exchange_client=exchange_client,
                         startTime=datetime.fromtimestamp(last_candle_timestamp/1000, tz=timezone.utc) - timedelta(minutes=10), 
                         endTime=get_last_complete_time_for_candles(interval)))
 
-def run_mfi_trading_algo(symbol, dry_run, 
+def run_mfi_trading_algo(symbol, dry_run, exchange_client,
                          negative_cancel_num=3, get_new_candles_function=get_new_candles_from_exchange,
                          candles = None, exit_after_no_candle=False, do_plot=True, out_dir="out", 
                          quantity=None, usdt_amount=None): 
     if quantity is None and usdt_amount is None:
         raise Exception("quantity is None and usdt_amount is None")
 
-    ticker = ExchangeClient.get_ticker_data(symbol=symbol)
+    ticker = exchange_client.get_ticker_data(symbol=symbol)
     current_price = float(ticker['lastPrice'])
     
     if usdt_amount is not None:
@@ -318,7 +317,7 @@ def run_mfi_trading_algo(symbol, dry_run,
     
     # Load initial candles and MFI
     if candles is None:
-        candles = get_candles(symbol, "1m")
+        candles = get_candles(symbol=symbol, interval="1m", exchange_client=exchange_client)
 
     mfi = calculate_mfi(candles, MFI_TIMEINTERVAL)
 
@@ -384,7 +383,7 @@ def run_mfi_trading_algo(symbol, dry_run,
                 last_local_minima = 100
                 bought = True
                 # buy signal
-                order = ExchangeClient.execute_market_order(symbol=symbol, side="buy", quantity=quantity, dry_run=dry_run)
+                order = exchange_client.execute_market_order(symbol=symbol, side="buy", quantity=quantity, dry_run=dry_run)
                 if order["price"] is None:
                     buy_price = candles[i][4] # take last close price for dry run
                 else:
@@ -416,7 +415,7 @@ def run_mfi_trading_algo(symbol, dry_run,
                 candles_since_buy = 0
                 bought = False
                 # sell signal
-                order = ExchangeClient.execute_market_order(symbol=symbol, side="sell", quantity=quantity, dry_run=dry_run)
+                order = exchange_client.execute_market_order(symbol=symbol, side="sell", quantity=quantity, dry_run=dry_run)
 
                 if order["price"] is None:
                     sell_price = candles[i][4] # take last close price for dry run
@@ -444,7 +443,7 @@ def run_mfi_trading_algo(symbol, dry_run,
                 "mfi": mfi,
                 "buy_signals": buy_signals,
                 "sell_signals": sell_signals
-            }, f"_trading_{start_time_str}_{ExchangeClient.__class__.__name__}", out_dir=out_dir)
+            }, f"_trading_{start_time_str}_{exchange_client.__class__.__name__}", out_dir=out_dir)
 
         logging.info(f"Waiting for the next candle, current candles above threshold: {candles_above_threshold}")
         
@@ -453,7 +452,7 @@ def run_mfi_trading_algo(symbol, dry_run,
         last_candle_datetime_obj = datetime.fromtimestamp(last_candle_timestamp/1000, tz=timezone.utc)
         logging.info(f"Last candle time before new candles, UNIX: {last_candle_timestamp}, UTC: {last_candle_datetime_obj}")
         
-        new_candles = get_new_candles_function(symbol, "1m", last_candle_timestamp)
+        new_candles = get_new_candles_function(symbol=symbol, interval="1m", last_candle_timestamp=last_candle_timestamp, exchange_client=exchange_client)
         all_current_timestamps = [candle[0] for candle in candles]
         really_new_candles = [candle for candle in new_candles if candle[0] not in all_current_timestamps]
 
@@ -481,7 +480,7 @@ def run_mfi_trading_algo(symbol, dry_run,
             logging.info(f"Running time exceeded {MFI_TRADING_TIMEOUT_H} hours. Exiting.")
             break
 
-    total_profit_minus_fees = total_profit - (len(buy_signals) + len(sell_signals))*usdt_amount_final*ExchangeClient.get_taker_fee_fraction()
+    total_profit_minus_fees = total_profit - (len(buy_signals) + len(sell_signals))*usdt_amount_final*exchange_client.get_taker_fee_fraction()
 
     logging.info(f"Finished. Total profit: {total_profit}, minus fees: {total_profit_minus_fees}")
 

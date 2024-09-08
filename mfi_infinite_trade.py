@@ -11,10 +11,11 @@ import os
 import time
 import concurrent.futures
 import signal
+import sys
 from multiprocessing import current_process, Manager
 from mfi_functions import setup_logging, calculate_mfi, \
                             find_extrema, plot_asset, get_candles, MFI_TIMEINTERVAL, \
-                            run_mfi_trading_algo, usd_to_quantity, termination_flag, set_exchange
+                            run_mfi_trading_algo, usd_to_quantity, termination_flag, get_exchange_client
 from mfi_analysis import mfi_analysis_main
 
 def run_mfi_trading_algo_wrapper(**kwargs):
@@ -36,8 +37,6 @@ if __name__ == "__main__":
 
     args = parser.parse_args()
 
-    set_exchange(args.exchange)
-
     symbols = None
     if args.symbols is not None:
         symbols = args.symbols.split(",")
@@ -47,6 +46,10 @@ if __name__ == "__main__":
         os.makedirs(out_directory_name)
 
     setup_logging(log_dir=out_directory_name, file_suffix=f"infinite_trade")
+    logging.info(f"Script called with: {' '.join(sys.argv)}")
+    logging.info(str(args))
+
+    exchange_client = get_exchange_client(args.exchange)
 
     logging.info(f"Started infinite trade script")
     iteration = 0
@@ -70,7 +73,8 @@ if __name__ == "__main__":
 
         logging.info(f"Starting analysis")
         logging.disable(logging.WARNING) # to avoid logging a lot of infos
-        analysis_results, analysis_df = mfi_analysis_main(symbols=symbols,
+        analysis_results, analysis_df = mfi_analysis_main(exchange_client=exchange_client,
+                                                          symbols=symbols,
                                                           no_vol_threshold=args.no_vol_threshold)
         logging.disable(logging.NOTSET)
 
@@ -91,6 +95,7 @@ if __name__ == "__main__":
                 futures.append(executor.submit(run_mfi_trading_algo_wrapper, 
                                             symbol=asset,
                                             usdt_amount=args.usdt_amount,
+                                            exchange_client=exchange_client,
                                             dry_run=args.dry_run,
                                             out_dir=out_directory_name))
             
