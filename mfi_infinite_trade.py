@@ -14,7 +14,7 @@ import signal
 from multiprocessing import current_process, Manager
 from mfi_functions import setup_logging, calculate_mfi, \
                             find_extrema, plot_asset, get_candles, MFI_TIMEINTERVAL, \
-                            run_mfi_trading_algo, usd_to_quantity, termination_flag
+                            run_mfi_trading_algo, usd_to_quantity, termination_flag, set_exchange
 from mfi_analysis import mfi_analysis_main
 
 def run_mfi_trading_algo_wrapper(**kwargs):
@@ -25,15 +25,18 @@ def run_mfi_trading_algo_wrapper(**kwargs):
 
 if __name__ == "__main__":
     parser = argparse.ArgumentParser(description="")
-    parser.add_argument("--config", required=True, help="Path to the YAML config file containing API keys")
     parser.add_argument("--usdt_amount", required=True, help="USDT amount to operate with. Will be translated into corresponding asset's quantity", type=float)
     parser.add_argument("--pnl_threshold", default=2, type=float)
     parser.add_argument("--liq_threshold", default=0, type=float)
-    parser.add_argument("--n_assets_to_trade", default=3, type=int)
+    parser.add_argument("--n_assets_to_trade", default=10, type=int)
     parser.add_argument("--dry-run", action="store_true")
+    parser.add_argument("--no_vol_threshold", action="store_true")
     parser.add_argument("--symbols", default=None, type=str)
+    parser.add_argument("--exchange", required=False, default="binance")
 
     args = parser.parse_args()
+
+    set_exchange(args.exchange)
 
     symbols = None
     if args.symbols is not None:
@@ -67,7 +70,8 @@ if __name__ == "__main__":
 
         logging.info(f"Starting analysis")
         logging.disable(logging.WARNING) # to avoid logging a lot of infos
-        analysis_results, analysis_df = mfi_analysis_main(symbols=symbols)
+        analysis_results, analysis_df = mfi_analysis_main(symbols=symbols,
+                                                          no_vol_threshold=args.no_vol_threshold)
         logging.disable(logging.NOTSET)
 
         analysis_df_sub = analysis_df[(analysis_df.pnl >= args.pnl_threshold) & (analysis_df.liquidity_score > args.liq_threshold)]

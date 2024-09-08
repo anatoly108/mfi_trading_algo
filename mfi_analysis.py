@@ -11,7 +11,7 @@ import os
 from mfi_functions import setup_logging, calculate_mfi, \
                             find_extrema, plot_asset, get_candles, MFI_TIMEINTERVAL, \
                             run_mfi_trading_algo, usd_to_quantity, ExchangeClient, VOL_THRESHOLD, \
-                            calculate_liquidity_score
+                            calculate_liquidity_score, set_exchange
 
 def convert_to_millions(volume):
     # Convert the volume to millions
@@ -173,7 +173,10 @@ if __name__ == "__main__":
     parser.add_argument("--plot_all", action="store_true")
     parser.add_argument("--no_vol_threshold", action="store_true")
     parser.add_argument("--vol_threshold", required=False, default=VOL_THRESHOLD, type=float)
+    parser.add_argument("--exchange", required=False, default="binance")
     args = parser.parse_args()
+
+    set_exchange(args.exchange)
 
     mfi_analysis_main(plot_all=args.plot_all, 
                       no_vol_threshold=args.no_vol_threshold, 

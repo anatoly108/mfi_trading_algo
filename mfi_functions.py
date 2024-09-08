@@ -31,7 +31,7 @@ MFI_TRADING_TIMEOUT_H = 6 # default is 12, 2 is for testing
 
 VOL_THRESHOLD = 100e3
 
-ExchangeClient = Binance("keys.yaml")
+ExchangeClient = None
 
 # Global termination flag
 termination_flag = multiprocessing.Value('i', 0)
@@ -80,6 +80,17 @@ def setup_logging(log_dir=None, file_suffix="", log_to_stdout=True):
 
     # Set the custom exception hook as the global one
     sys.excepthook = log_exception
+
+def set_exchange(exchange_name):
+    global ExchangeClient
+    if exchange_name == "binance":
+        ExchangeClient = Binance("keys.yaml")
+    elif exchange_name == "mexc":
+        ExchangeClient = Mexc("keys.yaml")
+    else:
+        raise Exception(f"Incorrect exchange: {exchange_name}")
+
+    logging.info(f"Exchange is set to: {ExchangeClient.__class__.__name__}")
 
 def calculate_liquidity_score(symbol, is_setup=False):
     global btc_liquidity_score_raw

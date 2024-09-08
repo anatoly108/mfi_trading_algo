@@ -8,7 +8,7 @@ import talib as ta
 import numpy as np
 import requests
 import sys
-from mfi_functions import setup_logging, run_mfi_trading_algo, usd_to_quantity
+from mfi_functions import setup_logging, run_mfi_trading_algo, usd_to_quantity, set_exchange
 
 if __name__ == "__main__":
     parser = argparse.ArgumentParser(description="")
@@ -16,9 +16,12 @@ if __name__ == "__main__":
     parser.add_argument("--quantity", required=False, help="Quantity to operate with", default=None, type=float)
     parser.add_argument("--usdt_amount", required=False, help="USDT amount to operate with. Will be translated into corresponding asset's quantity", default=None, type=float)
     parser.add_argument("--dry-run", action="store_true")
+    parser.add_argument("--exchange", required=False, default="binance")
 
     args = parser.parse_args()
     
+    set_exchange(args.exchange)
+
     out_directory_name = f"out/{datetime.now().strftime('%Y_%m_%d')}/trading/"
     setup_logging(log_dir = out_directory_name, file_suffix=f"{args.symbol}_")
 
