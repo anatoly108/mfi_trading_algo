@@ -444,7 +444,7 @@ def run_mfi_trading_algo(symbol, dry_run,
                 "mfi": mfi,
                 "buy_signals": buy_signals,
                 "sell_signals": sell_signals
-            }, f"_trading_{start_time_str}", out_dir=out_dir)
+            }, f"_trading_{start_time_str}_{ExchangeClient.__class__.__name__}", out_dir=out_dir)
 
         logging.info(f"Waiting for the next candle, current candles above threshold: {candles_above_threshold}")
         

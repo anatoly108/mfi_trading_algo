@@ -138,14 +138,14 @@ def mfi_analysis_main(plot_all=False, short=False, symbols=None, no_vol_threshol
     df = df.sort_values(by='total_profit', ascending=False)
 
     filename_suffix = datetime.now().strftime('%Y_%m_%d_%H_%M_%S')
-    out_directory_name = f"out/{datetime.now().strftime('%Y_%m_%d')}/analysis/{filename_suffix}"
+    out_directory_name = f"out/{datetime.now().strftime('%Y_%m_%d')}/analysis/{filename_suffix}_{ExchangeClient.__class__.__name__}"
 
     # Create the directory if it doesn't exist
     if not os.path.exists(out_directory_name):
         os.makedirs(out_directory_name)
     
-    df.to_csv(f"{out_directory_name}/{filename_suffix}_crypto_mfi_analysis.csv", index=False)
-    df.to_excel(f"{out_directory_name}/{filename_suffix}_crypto_mfi_analysis.xlsx", index=False)
+    df.to_csv(f"{out_directory_name}/{filename_suffix}_{ExchangeClient.__class__.__name__}_crypto_mfi_analysis.csv", index=False)
+    df.to_excel(f"{out_directory_name}/{filename_suffix}_{ExchangeClient.__class__.__name__}_crypto_mfi_analysis.xlsx", index=False)
 
     # Select top 10 assets based on highest total_profit
     top_assets = df[0:min([9, df.shape[0]])]
