@@ -11,7 +11,8 @@ import os
 from mfi_functions import setup_logging, calculate_mfi, \
                             find_extrema, plot_asset, get_candles, MFI_TIMEINTERVAL, \
                             run_mfi_trading_algo, usd_to_quantity, VOL_THRESHOLD, \
-                            calculate_liquidity_score, get_exchange_client, write_trading_results
+                            calculate_liquidity_score, get_exchange_client, write_trading_results, \
+                            MFI_TRADING_TIMEOUT_H, LOOKBACK_PERIOD_H
 
 def convert_to_millions(volume):
     # Convert the volume to millions
@@ -25,10 +26,65 @@ def convert_to_millions(volume):
         # For numbers less than 1M, show one decimal
         return f"{volume_in_millions:.1f}M"
 
+def calculate_range_bound_score(candles):
+    """
+    Calculate how range-bound an asset is based on its 1m candles from the past 24h.
+    The score will be high if the price tends to revert to its mean after deviations.
+    
+    :param candles: List of candles, where each candle is in the format [time, open, high, low, close, volume].
+    :return: A score between 0 (not range-bound) and 1 (perfectly range-bound).
+    """
+    # Extract close prices from the candles
+    close_prices = np.array([candle[4] for candle in candles])
+    
+    # Calculate the mean close price
+    mean_close = np.mean(close_prices)
+    
+    # Calculate deviations from the mean
+    deviations = close_prices - mean_close
+    
+    # Now, check if the price moves back toward the mean after moving away
+    reversion_count = 0
+    for i in range(1, len(deviations)):
+        # If the price was further from the mean and now it's closer, count as a reversion
+        if abs(deviations[i]) < abs(deviations[i-1]):
+            reversion_count += 1
+    
+    # Normalize the reversion count by the total number of candles (1440 in 24h data)
+    reversion_ratio = reversion_count / (len(candles) - 1)
+    
+    # The range-bound score is the reversion ratio (higher means more range-bound)
+    return reversion_ratio
+
+def calculate_volatility_range(candles):
+    """
+    Calculate the volatility range of an asset based on its 1m candles.
+    Higher score means more volatile behavior.
+    
+    :param candles: List of candles, where each candle is in the format [time, open, high, low, close, volume].
+    :return: A score between 0 (low volatility) and 1 (high volatility).
+    """
+    # Extract close prices from the candles
+    close_prices = np.array([candle[4] for candle in candles])
+    
+    # Calculate percentage price changes between consecutive candles
+    percent_changes = np.abs(np.diff(close_prices) / close_prices[:-1]) * 100
+    
+    # Sum the absolute percentage changes to get the total volatility
+    total_volatility = np.sum(percent_changes)
+    
+    # Define a maximum expected volatility for normalization (e.g., 100% is extremely volatile)
+    max_expected_volatility = 100  # Adjust based on what you consider the max volatility
+    # consider 100% is extreme volatility
+    
+    # Normalize the total volatility to a 0-1 scale
+    volatility_score = min(total_volatility / max_expected_volatility, 1)
+    
+    return volatility_score
 
 def analyze_pair(ticker_data, exchange_client):
     symbol = ticker_data["symbol"]
-    candles = get_candles(symbol=symbol, interval="1m", exchange_client=exchange_client)
+    candles = get_candles(symbol=symbol, interval="1m", exchange_client=exchange_client, hours=LOOKBACK_PERIOD_H+MFI_TRADING_TIMEOUT_H)
     if len(candles) == 0:
         return None
     
@@ -36,9 +92,9 @@ def analyze_pair(ticker_data, exchange_client):
     mfi = calculate_mfi(candles, MFI_TIMEINTERVAL)
     troughs, peaks = find_extrema(mfi)
 
-    # next, emulate a situation where second half of candles is unknown
-    part1_of_candles_num = round(len(candles)/2)
-    part2_of_candles_num = part1_of_candles_num + 1
+    # next, emulate a situation where only LOOKBACK_PERIOD_H candles is known
+    part1_of_candles_num = LOOKBACK_PERIOD_H * 60
+    part2_of_candles_num = part1_of_candles_num + 1 # MFI_TRADING_TIMEOUT_H * 60
     candles_part1 = candles[:part1_of_candles_num]
     candles_part2 = candles[part2_of_candles_num:]
     # just get the next candle from candles_part2
@@ -68,6 +124,8 @@ def analyze_pair(ticker_data, exchange_client):
     asset_price_change = round((1 - candles[0][4]/candles[-1][4]) * 100, 1)
 
     liquidity_score = calculate_liquidity_score(symbol=symbol, exchange_client=exchange_client)
+    range_bound_score = calculate_range_bound_score(candles_part1)
+    volatility_score = calculate_volatility_range(candles_part1)
 
     result_dict = {
         "symbol": symbol,
@@ -82,7 +140,9 @@ def analyze_pair(ticker_data, exchange_client):
         "trades_num": trades_num,
         "pnl": round((trading_results["total_profit"]/usdt)*100, 1),
         "asset_price_change": asset_price_change,
-        "liquidity_score": liquidity_score
+        "liquidity_score": liquidity_score,
+        "range_bound_score": range_bound_score,
+        "volatility_score": volatility_score
     }
 
     # Add all ticker data, but update only keys that are not present in 

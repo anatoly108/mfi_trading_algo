@@ -28,6 +28,7 @@ MFI_THRESHOLD_HIGH_MIN = 50
 MFI_STEP_THRESHOLD = 3
 MFI_TIMEINTERVAL = 14
 MFI_TRADING_TIMEOUT_H = 6 # default is 12, 2 is for testing
+LOOKBACK_PERIOD_H = 24 # anlysis is based on past 24h
 
 VOL_THRESHOLD = 100e3
 
@@ -190,13 +191,13 @@ def calculate_num_candles(interval, startTime, endTime):
 
 # note: this will return only complete candles!
 # startTime and endTime are datetime objects, easiest way to specify: datetime.strptime("2024-01-01 00:00:00", "%Y-%m-%d %H:%M:%S")
-def get_candles(symbol, interval, exchange_client, startTime=None, endTime=None):
+def get_candles(symbol, interval, exchange_client, startTime=None, endTime=None, hours=LOOKBACK_PERIOD_H):
     all_candles = []
     limit = 1000  # Maximum allowed by Binance
 
-    if startTime is None and endTime is None:
+    if startTime is None and endTime is None and hours is not None:
         now = get_last_complete_time_for_candles(interval)
-        startTime = now - timedelta(hours=24)
+        startTime = now - timedelta(hours=hours)
         endTime = now
 
     startTimeUnix = convert_to_unix(startTime.replace(tzinfo=timezone.utc))

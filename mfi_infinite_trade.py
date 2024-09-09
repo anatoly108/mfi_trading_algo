@@ -57,8 +57,6 @@ if __name__ == "__main__":
 
     logging.info(f"Started infinite trade script")
     iteration = 0
-    profits = []
-    profits_minus_fees = []
     total_profit = 0
     total_profit_minus_fees = 0
 
@@ -111,8 +109,6 @@ if __name__ == "__main__":
         total_profit += np.sum([result["total_profit"] for result in results])
         total_profit_minus_fees += np.sum([result["total_profit_minus_fees"] for result in results])
         logging.info(f"Total profit: {total_profit}, minus fees: {total_profit_minus_fees} USDT")
-        profits.append(total_profit)
-        profits_minus_fees.append(total_profit_minus_fees)
 
         logging.info(f"Writing results to file")
         write_trading_results(results=results,
