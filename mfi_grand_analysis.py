@@ -67,8 +67,7 @@ if __name__ == "__main__":
 
     logging.info(f"Script called with: {' '.join(sys.argv)}")
     logging.info(str(args))
-
-    for symbol in symbols:
+    for symbol in tqdm(symbols, desc="Symbols", position=0):
         logging.info(f"Running for symbol {symbol}")
         end_date = get_last_complete_time_for_candles("1m")
         start_date = end_date - timedelta(hours=args.months_back * 30 * 24) # simplistic: assume month has 30 days 
@@ -76,7 +75,7 @@ if __name__ == "__main__":
         timepoints = generate_time_points(start_date, end_date, MFI_TRADING_TIMEOUT_H)
         all_timepoint_results = []
         logging.disable(logging.WARNING) # to avoid logging a lot of infos
-        for timepoint in tqdm(timepoints):
+        for timepoint in tqdm(timepoints, desc="Timepoints", position=1, leave=False):
             timepoint_results = analyze_pair(ticker_data={"symbol": symbol},
                                              exchange_client=exchange_client,
                                              now=timepoint)
@@ -94,4 +93,3 @@ if __name__ == "__main__":
 
         df = pd.DataFrame(all_timepoint_results)
         df.to_csv(f"{out_directory_name}/{symbol}.csv", index=False)
-

@@ -73,14 +73,16 @@ def calculate_volatility_range(candles):
     # Sum the absolute percentage changes to get the total volatility
     total_volatility = np.sum(percent_changes)
     
-    # Define a maximum expected volatility for normalization (e.g., 100% is extremely volatile)
-    max_expected_volatility = 100  # Adjust based on what you consider the max volatility
-    # consider 100% is extreme volatility
+    # Determine the maximum expected volatility based on the number of candles
+    number_of_candles = len(candles)
+    max_volatility_per_candle = 1  # Example: assume 1% per candle is extreme
+    max_expected_volatility = number_of_candles * max_volatility_per_candle
     
     # Normalize the total volatility to a 0-1 scale
     volatility_score = min(total_volatility / max_expected_volatility, 1)
     
     return volatility_score
+
 
 def analyze_pair(ticker_data, exchange_client, now=None):
     symbol = ticker_data["symbol"]
