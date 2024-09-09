@@ -71,7 +71,7 @@ if __name__ == "__main__":
     for symbol in symbols:
         logging.info(f"Running for symbol {symbol}")
         end_date = get_last_complete_time_for_candles("1m")
-        start_date = end_date - timedelta(months=args.months_back)
+        start_date = end_date - timedelta(hours=args.months_back * 30 * 24) # simplistic: assume month has 30 days 
 
         timepoints = generate_time_points(start_date, end_date, MFI_TRADING_TIMEOUT_H)
         all_timepoint_results = []
