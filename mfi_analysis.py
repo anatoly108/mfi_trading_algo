@@ -191,7 +191,7 @@ def mfi_analysis_main(exchange_client, plot_all=False, short=False, symbols=None
             results.append(result)
     
     # results will become a DataFrame, so we only keep simple values, no lists/arrays 
-    subset_results = {key: value for key, value in results.items() if isinstance(value, (str, int, float))}
+    subset_results = [{key: value for key, value in result.items() if isinstance(value, (str, int, float))} for result in results]
 
     # Create a DataFrame from the subset results
     df = pd.DataFrame(subset_results)
