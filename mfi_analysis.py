@@ -84,7 +84,7 @@ def calculate_volatility_range(candles):
     return volatility_score
 
 
-def analyze_pair(ticker_data, exchange_client, now=None):
+def analyze_pair(ticker_data, exchange_client, now=None, do_calculate_liquidity_score=True):
     symbol = ticker_data["symbol"]
     candles = get_candles(symbol=symbol, 
                           interval="1m", 
@@ -128,8 +128,7 @@ def analyze_pair(ticker_data, exchange_client, now=None):
     total_profit_minus_fees = trading_results["total_profit"] - fees
 
     asset_price_change = round((1 - candles[0][4]/candles[-1][4]) * 100, 1)
-
-    liquidity_score = calculate_liquidity_score(symbol=symbol, exchange_client=exchange_client)
+    
     range_bound_score = calculate_range_bound_score(candles_part1)
     volatility_score = calculate_volatility_range(candles_part1)
 
@@ -146,10 +145,13 @@ def analyze_pair(ticker_data, exchange_client, now=None):
         "trades_num": trades_num,
         "pnl": round((trading_results["total_profit"]/usdt)*100, 1),
         "asset_price_change": asset_price_change,
-        "liquidity_score": liquidity_score,
         "range_bound_score": range_bound_score,
         "volatility_score": volatility_score
     }
+
+    if do_calculate_liquidity_score:
+        liquidity_score = calculate_liquidity_score(symbol=symbol, exchange_client=exchange_client)
+        result_dict["liquidity_score"] = liquidity_score
 
     # Add all ticker data, but update only keys that are not present in 
     for key, value in ticker_data.items():

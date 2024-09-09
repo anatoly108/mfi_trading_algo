@@ -78,7 +78,8 @@ if __name__ == "__main__":
         for timepoint in tqdm(timepoints, desc="Timepoints", position=1, leave=False):
             timepoint_results = analyze_pair(ticker_data={"symbol": symbol},
                                              exchange_client=exchange_client,
-                                             now=timepoint)
+                                             now=timepoint,
+                                             do_calculate_liquidity_score=False)
             # timepoint_results is the "input" data that we use to trade next MFI_TRADING_TIMEOUT_H hours
             # now, we need "output" data which is the trading results of the next MFI_TRADING_TIMEOUT_H hours
             # we'll sumply get it with next timepoint_results because it will be MFI_TRADING_TIMEOUT_H shifted
