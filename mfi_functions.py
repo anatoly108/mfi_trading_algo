@@ -191,14 +191,19 @@ def calculate_num_candles(interval, startTime, endTime):
 
 # note: this will return only complete candles!
 # startTime and endTime are datetime objects, easiest way to specify: datetime.strptime("2024-01-01 00:00:00", "%Y-%m-%d %H:%M:%S")
-def get_candles(symbol, interval, exchange_client, startTime=None, endTime=None, hours=LOOKBACK_PERIOD_H):
+def get_candles(symbol, interval, exchange_client, startTime=None, endTime=None, hours=LOOKBACK_PERIOD_H, now=None):
     all_candles = []
     limit = 1000  # Maximum allowed by Binance
 
     if startTime is None and endTime is None and hours is not None:
-        now = get_last_complete_time_for_candles(interval)
+        if now is None:
+            now = get_last_complete_time_for_candles(interval)
+
         startTime = now - timedelta(hours=hours)
         endTime = now
+
+    if startTime is None and endTime is None and hours is None:
+        raise Exception("startTime is None and endTime is None and hours is None")
 
     startTimeUnix = convert_to_unix(startTime.replace(tzinfo=timezone.utc))
     endTimeUnix = convert_to_unix(endTime.replace(tzinfo=timezone.utc)) + 1

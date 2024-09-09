@@ -82,9 +82,13 @@ def calculate_volatility_range(candles):
     
     return volatility_score
 
-def analyze_pair(ticker_data, exchange_client):
+def analyze_pair(ticker_data, exchange_client, now=None):
     symbol = ticker_data["symbol"]
-    candles = get_candles(symbol=symbol, interval="1m", exchange_client=exchange_client, hours=LOOKBACK_PERIOD_H+MFI_TRADING_TIMEOUT_H)
+    candles = get_candles(symbol=symbol, 
+                          interval="1m", 
+                          exchange_client=exchange_client, 
+                          hours=LOOKBACK_PERIOD_H+MFI_TRADING_TIMEOUT_H,
+                          now=now)
     if len(candles) == 0:
         return None
     
@@ -150,50 +154,42 @@ def analyze_pair(ticker_data, exchange_client):
         if key not in result_dict:
             result_dict[key] = value
 
+    if "quoteVolume" in result_dict.keys():
+        result_dict["quoteVolume"] = float(result_dict["quoteVolume"])
+
     return result_dict
 
 
-def mfi_analysis_main(exchange_client, plot_all=False, short=False, symbols=None, no_vol_threshold=False, vol_threshold=VOL_THRESHOLD):
-    # Filter symbols that end with 'USDT' and are available for spot trading
+def mfi_analysis_main(exchange_client, plot_all=False, short=False, symbols=None, no_vol_threshold=False, vol_threshold=VOL_THRESHOLD, now=None):
     if symbols is None:
         symbols = exchange_client.get_all_spot_usdt_pairs()
-    # for testing specific symbols
-    # symbols = ["AUDIOUSDT"]
     
-    tickers = exchange_client.get_all_ticker_data()
     tickers_final = []
 
-    for symbol in symbols:
-        ticker = next((ticker for ticker in tickers if ticker["symbol"] == symbol), None)
-        if ticker is None:
-            continue
+    if no_vol_threshold:
+        tickers_final = [{"symbol": symbol} for symbol in symbols]
+    else:
+        tickers = exchange_client.get_all_ticker_data()
+        for symbol in symbols:
+            ticker = next((ticker for ticker in tickers if ticker["symbol"] == symbol), None)
+            if ticker is None:
+                continue
 
-        # 24h volume threshold
-        if float(ticker["quoteVolume"]) > vol_threshold or no_vol_threshold: 
-            tickers_final.append(ticker)
+            # 24h volume threshold
+            if float(ticker["quoteVolume"]) > vol_threshold or no_vol_threshold: 
+                tickers_final.append(ticker)
 
     print("running analysis")
     results = []
     for ticker in tqdm(tickers_final):
-        result = analyze_pair(ticker_data=ticker, exchange_client=exchange_client)
+        result = analyze_pair(ticker_data=ticker, 
+                              exchange_client=exchange_client, 
+                              now=now)
         if result:
             results.append(result)
-            
-    subset_results = [
-    {
-        "symbol": res["symbol"],
-        "total_profit": res["total_profit"],
-        "fees": res["fees"],
-        "total_profit_minus_fees": res["total_profit_minus_fees"],
-        "trades_num": res["trades_num"],
-        "pnl": res["pnl"],
-        "quoteVolume": convert_to_millions(float(res["quoteVolume"])),
-        "quoteVolume_raw": float(res["quoteVolume"]),
-        "asset_price_change": res["asset_price_change"],
-        "liquidity_score": res["liquidity_score"]
-    }
-        for res in results
-    ]
+    
+    # results will become a DataFrame, so we only keep simple values, no lists/arrays 
+    subset_results = {key: value for key, value in results.items() if isinstance(value, (str, int, float))}
 
     # Create a DataFrame from the subset results
     df = pd.DataFrame(subset_results)
@@ -237,6 +233,8 @@ def mfi_analysis_main(exchange_client, plot_all=False, short=False, symbols=None
 
 if __name__ == "__main__":
     parser = argparse.ArgumentParser(description="")
+    parser.add_argument("--symbols", default=None, type=str)
+    parser.add_argument("--now", default=None, type=str) # in the format: 2024_08_20__18_54 in UTC
     parser.add_argument("--plot_all", action="store_true")
     parser.add_argument("--no_vol_threshold", action="store_true")
     parser.add_argument("--vol_threshold", required=False, default=VOL_THRESHOLD, type=float)
@@ -245,7 +243,17 @@ if __name__ == "__main__":
 
     exchange_client = get_exchange_client(args.exchange)
 
+    symbols = None
+    if args.symbols is not None:
+        symbols = args.symbols.split(",")
+
+    now = None
+    if args.now is not None:
+        now = datetime.strptime(args.now, "%Y_%m_%d__%H_%M").replace(tzinfo=timezone.utc)
+
     mfi_analysis_main(exchange_client=exchange_client,
                       plot_all=args.plot_all, 
                       no_vol_threshold=args.no_vol_threshold, 
-                      vol_threshold=args.vol_threshold)
+                      vol_threshold=args.vol_threshold,
+                      symbols=symbols,
+                      now=now)
