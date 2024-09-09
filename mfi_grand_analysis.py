@@ -62,7 +62,7 @@ if __name__ == "__main__":
     if not os.path.exists(out_directory_name):
         os.makedirs(out_directory_name)
 
-    setup_logging(log_dir = out_directory_name, file_suffix=f"{args.symbol}_")
+    setup_logging(log_dir = out_directory_name)
 
     logging.info(f"Script called with: {' '.join(sys.argv)}")
     logging.info(str(args))
