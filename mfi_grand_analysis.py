@@ -55,17 +55,17 @@ if __name__ == "__main__":
     if symbols is None:
         symbols = exchange_client.get_all_spot_usdt_pairs()
 
-    setup_logging(log_dir = out_directory_name, file_suffix=f"{args.symbol}_")
-
-    logging.info(f"Script called with: {' '.join(sys.argv)}")
-    logging.info(str(args))
-
     filename_suffix = datetime.now().strftime('%Y_%m_%d_%H_%M_%S')
     out_directory_name = f"out/{datetime.now().strftime('%Y_%m_%d')}/grand_analysis/{filename_suffix}_{exchange_client.__class__.__name__}"
     
     # Create the directory if it doesn't exist
     if not os.path.exists(out_directory_name):
         os.makedirs(out_directory_name)
+
+    setup_logging(log_dir = out_directory_name, file_suffix=f"{args.symbol}_")
+
+    logging.info(f"Script called with: {' '.join(sys.argv)}")
+    logging.info(str(args))
 
     for symbol in symbols:
         logging.info(f"Running for symbol {symbol}")
