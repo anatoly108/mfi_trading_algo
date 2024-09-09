@@ -16,7 +16,7 @@ from mfi_functions import setup_logging, calculate_mfi, \
                             MFI_TRADING_TIMEOUT_H, LOOKBACK_PERIOD_H, convert_to_unix, get_last_complete_time_for_candles
 from mfi_analysis import analyze_pair
 
-def generate_time_points(start_date, end_date, hours):
+def generate_timepoints(start_date, end_date, hours):
     """
     Generates intervals of a specified number of hours from end_date back to start_date.
     
@@ -25,20 +25,17 @@ def generate_time_points(start_date, end_date, hours):
     :param hours: The number of hours for each interval.
     :return: List of datetime objects representing the intervals.
     """
-    intervals = []
+    timepoints = []
     current_time = end_date
     
     # Keep generating intervals while the current time is greater than start_date
+    # important: timepoints are generated from most recent to oldest
     while current_time > start_date:
-        intervals.append(current_time)
+        timepoints.append(current_time)
         # Subtract the specified number of hours from the current time
         current_time -= timedelta(hours=hours)
     
-    # Ensure the start_date is included if we overshoot it
-    if intervals[-1] > start_date:
-        intervals.append(start_date)
-    
-    return intervals
+    return timepoints
 
 if __name__ == "__main__":
     parser = argparse.ArgumentParser(description="")
@@ -72,7 +69,8 @@ if __name__ == "__main__":
         end_date = get_last_complete_time_for_candles("1m")
         start_date = end_date - timedelta(hours=args.months_back * 30 * 24) # simplistic: assume month has 30 days 
 
-        timepoints = generate_time_points(start_date, end_date, MFI_TRADING_TIMEOUT_H)
+        # important: timepoints are generated from most recent to oldest
+        timepoints = generate_timepoints(start_date, end_date, MFI_TRADING_TIMEOUT_H)
         all_timepoint_results = []
         logging.disable(logging.WARNING) # to avoid logging a lot of infos
         for timepoint in tqdm(timepoints, desc="Timepoints", position=1, leave=False):
@@ -80,6 +78,11 @@ if __name__ == "__main__":
                                              exchange_client=exchange_client,
                                              now=timepoint,
                                              do_calculate_liquidity_score=False)
+            if timepoint_results is None:
+                # not enough candles to cover history that far back
+                # that's where it's important that timepoints are generated from most recent to oldest
+                break
+
             # timepoint_results is the "input" data that we use to trade next MFI_TRADING_TIMEOUT_H hours
             # now, we need "output" data which is the trading results of the next MFI_TRADING_TIMEOUT_H hours
             # we'll sumply get it with next timepoint_results because it will be MFI_TRADING_TIMEOUT_H shifted
@@ -88,8 +91,8 @@ if __name__ == "__main__":
 
             # all_timepoint_results will become a DataFrame, so we only keep simple values, no lists/arrays 
             timepoint_results_sub = {key: value for key, value in timepoint_results.items() if isinstance(value, (str, int, float))}
-
             all_timepoint_results.append(timepoint_results_sub)
+
         logging.disable(logging.NOTSET)
 
         df = pd.DataFrame(all_timepoint_results)

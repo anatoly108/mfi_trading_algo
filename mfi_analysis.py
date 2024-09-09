@@ -92,8 +92,13 @@ def analyze_pair(ticker_data, exchange_client, now=None, do_calculate_liquidity_
                           hours=LOOKBACK_PERIOD_H+MFI_TRADING_TIMEOUT_H,
                           now=now)
     if len(candles) == 0:
+        # no candles for the period
         return None
     
+    if len(candles) < (LOOKBACK_PERIOD_H+MFI_TRADING_TIMEOUT_H) * 60:
+        # not enough candles: history doesn't go that far back
+        return None
+
     # first, let's calculate perfect extrema to know how a perfect trading would look like
     mfi = calculate_mfi(candles, MFI_TIMEINTERVAL)
     troughs, peaks = find_extrema(mfi)
