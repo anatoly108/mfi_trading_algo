@@ -97,8 +97,8 @@ def calculate_ema_and_angle(candles):
     close_prices = np.array([candle[4] for candle in candles], dtype=float)
     
     # Calculate EMA200 and EMA100 using TA-Lib
-    ema200 = talib.EMA(close_prices, timeperiod=200)
-    ema100 = talib.EMA(close_prices, timeperiod=100)
+    ema200 = ta.EMA(close_prices, timeperiod=200)
+    ema100 = ta.EMA(close_prices, timeperiod=100)
 
     if ema200 is None or ema100 is None:
         return None, None, None, None
