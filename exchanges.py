@@ -30,7 +30,7 @@ def retry_decorator(max_retries=3, delay=1):
         return wrapper
     return decorator
 
-def semaphore_decorator(self):
+def semaphore_decorator():
     """
     A decorator to retry a function call in case of ConnectionError,
     with access to the class instance (self).
@@ -108,7 +108,7 @@ class Binance(Exchange):
     def __init__(self, config_path="", semaphore=None):
         super().__init__(config_path, semaphore)
     
-    @semaphore_decorator
+    @semaphore_decorator()
     def get_candles(self, symbol: str, interval: str, limit: int, startTime: int, endTime: int):
         candles = BinanceClient().get_klines(symbol=symbol, interval=interval, limit=limit, startTime=startTime, endTime=endTime)
         # time, open, high, low, close, volume
@@ -118,7 +118,7 @@ class Binance(Exchange):
         ]
         return formatted_candles
 
-    @semaphore_decorator
+    @semaphore_decorator()
     def execute_market_order_internal(self, symbol: str, side: str, quantity: float):
         if side.upper() == "BUY":
             order = BinanceClient(self.api_key, self.api_secret).order_market_buy(symbol=symbol, quantity=quantity)
@@ -133,7 +133,7 @@ class Binance(Exchange):
 
         return {'price': final_price, 'order_obj': order}
     
-    @semaphore_decorator
+    @semaphore_decorator()
     def get_ticker_data(self, symbol: str):
         return(BinanceClient().get_ticker(symbol=symbol, type="MINI"))
 
@@ -148,11 +148,11 @@ class Binance(Exchange):
     def get_taker_fee_fraction(self):
         return 0.075/100
 
-    @semaphore_decorator
+    @semaphore_decorator()
     def get_all_ticker_data(self):
         return BinanceClient().get_ticker(type="MINI")
 
-    @semaphore_decorator
+    @semaphore_decorator()
     def get_order_book(self, symbol, limit=100):
         return BinanceClient().get_order_book(symbol=symbol, limit=limit)
 
