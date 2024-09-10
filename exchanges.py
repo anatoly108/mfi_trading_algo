@@ -54,6 +54,8 @@ class RetryMeta(type):
 
 class Exchange(metaclass=RetryMeta):
     def __init__(self, config_path, semaphore):
+        self.semaphore = semaphore
+
         if not os.path.exists(config_path):
             self.api_key = None
             self.api_secret = None
@@ -66,8 +68,7 @@ class Exchange(metaclass=RetryMeta):
         # Dynamically load API keys based on the class name (binance/mexc)
         self.api_key = config.get(self.__class__.__name__.lower(), {}).get('api_key')
         self.api_secret = config.get(self.__class__.__name__.lower(), {}).get('api_secret')
-        self.semaphore = semaphore
-
+        
     def execute_market_order(self, symbol: str, side: str, quantity: float, dry_run: bool):
         if dry_run:
             logging.info(f"Dry run {side}")
