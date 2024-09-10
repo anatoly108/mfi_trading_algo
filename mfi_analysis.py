@@ -85,6 +85,36 @@ def calculate_volatility_range(candles):
     
     return volatility_score
 
+def calculate_ema_and_angle(candles):
+    """
+    Calculate EMA200, EMA100, and their angle from a list of candles.
+    
+    :param candles: List of candles, where each candle is in the format [time, open, high, low, close, volume].
+    :return: EMA200, EMA100, and EMA angle.
+    """
+    # Extract close prices from the candles
+    close_prices = np.array([candle[4] for candle in candles], dtype=float)
+    
+    # Calculate EMA200 and EMA100 using TA-Lib
+    ema200 = talib.EMA(close_prices, timeperiod=200)
+    ema100 = talib.EMA(close_prices, timeperiod=100)
+
+    if ema200 is None or ema100 is None:
+        return None, None, None, None
+    
+    # Get the latest EMA values
+    ema200_latest = ema200[-1]
+    ema100_latest = ema100[-1]
+    
+    # Calculate EMA angles
+    ema200_start = ema200[0]
+    ema100_start = ema100[0]
+    
+    # Avoid division by zero and invalid values
+    ema200_angle = np.arctan((ema200_latest - ema200_start) / 200) * (180 / np.pi)
+    ema100_angle = np.arctan((ema100_latest - ema100_start) / 100) * (180 / np.pi)
+    
+    return ema100_latest, ema200_latest, ema100_angle, ema200_angle
 
 def analyze_pair(ticker_data, exchange_client, now=None, do_calculate_liquidity_score=True):
     symbol = ticker_data["symbol"]
@@ -139,6 +169,7 @@ def analyze_pair(ticker_data, exchange_client, now=None, do_calculate_liquidity_
     volatility_score = calculate_volatility_range(candles)
     # this will be approximate because we can't calculate every single trade here
     quote_volume = np.sum([candle[4] * candle[5] for candle in candles])
+    ema100_latest, ema200_latest, ema100_angle, ema200_angle = calculate_ema_and_angle(candles)
 
     result_dict = {
         "symbol": symbol,
@@ -155,7 +186,11 @@ def analyze_pair(ticker_data, exchange_client, now=None, do_calculate_liquidity_
         "asset_price_change": asset_price_change,
         "range_bound_score": range_bound_score,
         "volatility_score": volatility_score,
-        "quote_volume": quote_volume
+        "quote_volume": quote_volume,
+        "ema100_latest": ema100_latest, 
+        "ema200_latest": ema200_latest, 
+        "ema100_angle": ema100_angle, 
+        "ema200_angle": ema200_angle
     }
 
     if do_calculate_liquidity_score:
