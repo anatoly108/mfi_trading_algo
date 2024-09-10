@@ -39,7 +39,7 @@ def generate_timepoints(start_date, end_date, hours):
     
     return timepoints
 
-def process_symbol(args, symbol, exchange_client, out_directory_name):
+def process_symbol(args, symbol, exchange_client, out_directory_name, bar_pos):
     logging.info(f"Running for symbol {symbol}")
     end_date = get_last_complete_time_for_candles("1m")
     start_date = end_date - timedelta(hours=args.months_back * 30 * 24) # simplistic: assume month has 30 days 
@@ -48,7 +48,7 @@ def process_symbol(args, symbol, exchange_client, out_directory_name):
     timepoints = generate_timepoints(start_date, end_date, MFI_TRADING_TIMEOUT_H)
     all_timepoint_results = []
 
-    for timepoint in tqdm(timepoints, desc="Timepoints", position=1, leave=False):
+    for timepoint in tqdm(timepoints, desc="Timepoints", position=bar_pos, leave=True):
         timepoint_results = analyze_pair(ticker_data={"symbol": symbol},
                                         exchange_client=exchange_client,
                                         now=timepoint,
@@ -109,11 +109,12 @@ if __name__ == "__main__":
 
         with concurrent.futures.ProcessPoolExecutor(max_workers=args.threads) as executor:
             futures = []
-            for symbol in symbols:
+            for i, symbol in enumerate(symbols):
                 futures.append(executor.submit(process_symbol, 
                                             args=args, 
                                             symbol=symbol, 
                                             exchange_client=exchange_client, 
-                                            out_directory_name=out_directory_name))
+                                            out_directory_name=out_directory_name,
+                                            bar_pos=i+1))
             
-            results = [future.result() for future in tqdm(concurrent.futures.as_completed(futures), total=len(futures))]
+            results = [future.result() for future in tqdm(concurrent.futures.as_completed(futures), total=len(futures), position=0)]
