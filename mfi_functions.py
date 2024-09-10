@@ -258,8 +258,8 @@ def plot_asset(asset_data, plot_suffix="", out_dir="out"):
     df["timestamp"] = pd.to_datetime(df["timestamp"], unit='ms')
     df.set_index("timestamp", inplace=True)
     df = df.astype(float)
-    df['EMA200'] = talib.EMA(df['close'], timeperiod=200)
-    df['EMA100'] = talib.EMA(df['close'], timeperiod=100)
+    df['EMA200'] = ta.EMA(df['close'], timeperiod=200)
+    df['EMA100'] = ta.EMA(df['close'], timeperiod=100)
 
     # Create addplot objects for EMAs
     ema200_plot = mpf.make_addplot(df['EMA200'], color='blue', width=1.0, label='EMA200')
