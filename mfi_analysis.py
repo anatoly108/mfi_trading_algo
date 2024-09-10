@@ -135,11 +135,10 @@ def analyze_pair(ticker_data, exchange_client, now=None, do_calculate_liquidity_
     total_profit_minus_fees = trading_results["total_profit"] - fees
 
     asset_price_change = round((1 - candles[0][4]/candles[-1][4]) * 100, 1)
-    
-    range_bound_score = calculate_range_bound_score(candles_part1)
-    volatility_score = calculate_volatility_range(candles_part1)
+    range_bound_score = calculate_range_bound_score(candles)
+    volatility_score = calculate_volatility_range(candles)
     # this will be approximate because we can't calculate every single trade here
-    quote_volume = np.sum([candle[4] * candle[5] for candle in candles_part1])
+    quote_volume = np.sum([candle[4] * candle[5] for candle in candles])
 
     result_dict = {
         "symbol": symbol,
@@ -150,9 +149,9 @@ def analyze_pair(ticker_data, exchange_client, now=None, do_calculate_liquidity_
         "profits": trading_results["profits"],
         "total_profit": round(trading_results["total_profit"], 1),
         "total_profit_minus_fees": round(total_profit_minus_fees, 1),
+        "pnl": round((trading_results["total_profit"]/usdt)*100, 1),
         "fees": fees,
         "trades_num": trades_num,
-        "pnl": round((trading_results["total_profit"]/usdt)*100, 1),
         "asset_price_change": asset_price_change,
         "range_bound_score": range_bound_score,
         "volatility_score": volatility_score,
