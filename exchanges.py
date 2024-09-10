@@ -30,7 +30,7 @@ def retry_decorator(max_retries=3, delay=1):
         return wrapper
     return decorator
 
-def semaphore_decorator():
+def semaphore_decorator(self):
     """
     A decorator to retry a function call in case of ConnectionError,
     with access to the class instance (self).
