@@ -27,8 +27,8 @@ MFI_THRESHOLD_HIGH_MIN = 50
 
 MFI_STEP_THRESHOLD = 3
 MFI_TIMEINTERVAL = 14
-MFI_TRADING_TIMEOUT_H = 6 # default is 12, 2 is for testing
-LOOKBACK_PERIOD_H = 24 # anlysis is based on past 24h
+MFI_TRADING_TIMEOUT_H = 4
+LOOKBACK_PERIOD_H = 24 # analysis is based on past 24h
 
 VOL_THRESHOLD = 100e3
 
