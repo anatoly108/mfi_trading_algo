@@ -7,6 +7,7 @@ import logging
 import numpy as np
 import requests
 import time
+from contextlib import nullcontext
 
 def retry_decorator(max_retries=3, delay=1):
     """
