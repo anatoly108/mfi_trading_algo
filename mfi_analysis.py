@@ -201,7 +201,7 @@ def mfi_analysis_main(exchange_client, plot_all=False, short=False, symbols=None
         print("running analysis")
         with concurrent.futures.ProcessPoolExecutor(max_workers=threads) as executor:
             futures = []
-            for symbol in symbols:
+            for ticker in tickers_final:
                 futures.append(executor.submit(analyze_pair, 
                                                 ticker_data=ticker, 
                                                 exchange_client=exchange_client, 

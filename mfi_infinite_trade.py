@@ -35,6 +35,7 @@ if __name__ == "__main__":
     parser.add_argument("--no_vol_threshold", action="store_true")
     parser.add_argument("--symbols", default=None, type=str)
     parser.add_argument("--exchange", required=False, default="binance")
+    parser.add_argument("--threads", default=os.cpu_count(), type=int)
 
     args = parser.parse_args()
 
@@ -77,7 +78,8 @@ if __name__ == "__main__":
         logging.disable(logging.WARNING) # to avoid logging a lot of infos
         analysis_results, analysis_df = mfi_analysis_main(exchange_client=exchange_client,
                                                           symbols=symbols,
-                                                          no_vol_threshold=args.no_vol_threshold)
+                                                          no_vol_threshold=args.no_vol_threshold,
+                                                          threads=args.threads)
         logging.disable(logging.NOTSET)
 
         analysis_df_sub = analysis_df[(analysis_df.pnl >= args.pnl_threshold) & (analysis_df.liquidity_score > args.liq_threshold)]
