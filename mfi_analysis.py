@@ -175,7 +175,7 @@ def analyze_pair(ticker_data, exchange_client, now=None, do_calculate_liquidity_
     return result_dict
 
 
-def mfi_analysis_main(exchange_client, plot_all=False, short=False, symbols=None, no_vol_threshold=False, vol_threshold=VOL_THRESHOLD, now=None):
+def mfi_analysis_main(exchange_client, plot_all=False, short=False, symbols=None, no_vol_threshold=False, vol_threshold=VOL_THRESHOLD, now=None, threads=os.cpu_count()):
     if symbols is None:
         symbols = exchange_client.get_all_spot_usdt_pairs()
     
@@ -199,7 +199,7 @@ def mfi_analysis_main(exchange_client, plot_all=False, short=False, symbols=None
         exchange_client.semaphore = semaphore
 
         print("running analysis")
-        with concurrent.futures.ProcessPoolExecutor(max_workers=3) as executor:
+        with concurrent.futures.ProcessPoolExecutor(max_workers=threads) as executor:
             futures = []
             for symbol in symbols:
                 futures.append(executor.submit(analyze_pair, 
@@ -207,7 +207,7 @@ def mfi_analysis_main(exchange_client, plot_all=False, short=False, symbols=None
                                                 exchange_client=exchange_client, 
                                                 now=now))
             
-            results = [future.result() for future in tqdm(concurrent.futures.as_completed(futures)) if future.result()]
+            results = [future.result() for future in tqdm(concurrent.futures.as_completed(futures), total=len(futures)) if future.result()]
         
     # results will become a DataFrame, so we only keep simple values, no lists/arrays 
     subset_results = [{key: value for key, value in result.items() if isinstance(value, (str, int, float))} for result in results]
@@ -260,6 +260,7 @@ if __name__ == "__main__":
     parser.add_argument("--no_vol_threshold", action="store_true")
     parser.add_argument("--vol_threshold", required=False, default=VOL_THRESHOLD, type=float)
     parser.add_argument("--exchange", required=False, default="binance")
+    parser.add_argument("--threads", default=os.cpu_count(), type=int)
     args = parser.parse_args()
 
     exchange_client = get_exchange_client(args.exchange)
@@ -277,4 +278,5 @@ if __name__ == "__main__":
                       no_vol_threshold=args.no_vol_threshold, 
                       vol_threshold=args.vol_threshold,
                       symbols=symbols,
-                      now=now)
+                      now=now,
+                      threads=threads)

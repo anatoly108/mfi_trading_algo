@@ -74,7 +74,9 @@ if __name__ == "__main__":
     parser = argparse.ArgumentParser(description="")
     parser.add_argument("--symbols", default=None, type=str)
     parser.add_argument("--months_back", default=6, type=int)
+    parser.add_argument("--threads", default=os.cpu_count(), type=int)
     parser.add_argument("--exchange", required=False, default="binance")
+    
     args = parser.parse_args()
 
     exchange_client = get_exchange_client(args.exchange)
@@ -98,17 +100,20 @@ if __name__ == "__main__":
     logging.info(f"Script called with: {' '.join(sys.argv)}")
     logging.info(str(args))
     
-    SemaphoreDecorator.initialize_semaphore(1)
     logging.disable(logging.WARNING) # to avoid logging a lot of infos
-    with concurrent.futures.ProcessPoolExecutor(max_workers=3) as executor:
-        futures = []
-        for symbol in symbols:
-            futures.append(executor.submit(process_symbol, 
-                                           args=args, 
-                                           symbol=symbol, 
-                                           exchange_client=exchange_client, 
-                                           timepoint=timepoint,
-                                           out_directory_name=out_directory_name))
-        
-        results = [future.result() for future in tqdm(concurrent.futures.as_completed(futures))]
-        
+
+    with Manager() as manager:
+        semaphore = manager.BoundedSemaphore(1) # allow only 1 process at a time to make a request
+        exchange_client.semaphore = semaphore
+
+        with concurrent.futures.ProcessPoolExecutor(max_workers=args.threads) as executor:
+            futures = []
+            for symbol in symbols:
+                futures.append(executor.submit(process_symbol, 
+                                            args=args, 
+                                            symbol=symbol, 
+                                            exchange_client=exchange_client, 
+                                            timepoint=timepoint,
+                                            out_directory_name=out_directory_name))
+            
+            results = [future.result() for future in tqdm(concurrent.futures.as_completed(futures), total=len(futures))]
