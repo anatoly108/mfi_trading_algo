@@ -115,8 +115,22 @@ def calculate_ema_and_angle(candles):
     # Avoid division by zero and invalid values
     ema200_angle = np.arctan((ema200_latest - ema200_start) / 200) * (180 / np.pi)
     ema100_angle = np.arctan((ema100_latest - ema100_start) / 100) * (180 / np.pi)
-    
-    return ema100_start, ema100_latest, ema100_angle, ema100_start, ema200_latest , ema200_angle
+
+    # Normalize EMA values
+    min_price = np.min(close_prices)
+    max_price = np.max(close_prices)
+
+    # Avoid division by zero
+    price_range = max_price - min_price
+    if price_range == 0:
+        ema100_normalized = 0
+        ema200_normalized = 0
+    else:
+        # Normalize EMA values to range 0-1
+        ema100_normalized = (ema100_latest - min_price) / price_range
+        ema200_normalized = (ema200_latest - min_price) / price_range
+
+    return ema100_start, ema100_latest, ema100_angle, ema100_normalized, ema100_start, ema200_latest, ema200_angle, ema200_normalized
 
 def analyze_pair(ticker_data, exchange_client, now=None, do_calculate_liquidity_score=True):
     symbol = ticker_data["symbol"]
@@ -171,7 +185,7 @@ def analyze_pair(ticker_data, exchange_client, now=None, do_calculate_liquidity_
     volatility_score = calculate_volatility_range(candles)
     # this will be approximate because we can't calculate every single trade here
     quote_volume = np.sum([candle[4] * candle[5] for candle in candles])
-    ema100_start, ema100_latest, ema100_angle, ema100_start, ema200_latest , ema200_angle = calculate_ema_and_angle(candles)
+    ema100_start, ema100_latest, ema100_angle, ema100_normalized, ema100_start, ema200_latest, ema200_angle, ema200_normalized = calculate_ema_and_angle(candles)
 
     result_dict = {
         "symbol": symbol,
@@ -192,9 +206,11 @@ def analyze_pair(ticker_data, exchange_client, now=None, do_calculate_liquidity_
         "ema100_start":ema100_start, 
         "ema100_latest":ema100_latest, 
         "ema100_angle":ema100_angle, 
+        "ema100_normalized": ema100_normalized,
         "ema100_start":ema100_start, 
         "ema200_latest":ema200_latest,
-        "ema200_angle":ema200_angle
+        "ema200_angle":ema200_angle,
+        "ema200_normalized": ema200_normalized
     }
 
     if do_calculate_liquidity_score:
