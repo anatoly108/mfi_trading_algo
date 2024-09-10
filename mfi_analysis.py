@@ -263,7 +263,9 @@ def mfi_analysis_main(exchange_client, plot_all=False, short=False, symbols=None
                                                 now=now))
             
             results = [future.result() for future in tqdm(concurrent.futures.as_completed(futures), total=len(futures)) if future.result()]
-        
+    
+    exchange_client.semaphore = None # remove semaphore: otherwise it will hang indefinitely when manager is closed
+    
     # results will become a DataFrame, so we only keep simple values, no lists/arrays 
     subset_results = [{key: value for key, value in result.items() if isinstance(value, (str, int, float))} for result in results]
 
