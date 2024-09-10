@@ -8,6 +8,7 @@ from tqdm import tqdm
 from scipy.signal import find_peaks
 import argparse
 import os
+from multiprocessing import BoundedSemaphore, Manager
 from mfi_functions import setup_logging, calculate_mfi, \
                             find_extrema, plot_asset, get_candles, MFI_TIMEINTERVAL, \
                             run_mfi_trading_algo, usd_to_quantity, VOL_THRESHOLD, \
@@ -192,15 +193,21 @@ def mfi_analysis_main(exchange_client, plot_all=False, short=False, symbols=None
             if float(ticker["quoteVolume"]) > vol_threshold or no_vol_threshold: 
                 tickers_final.append(ticker)
 
-    print("running analysis")
-    results = []
-    for ticker in tqdm(tickers_final):
-        result = analyze_pair(ticker_data=ticker, 
-                              exchange_client=exchange_client, 
-                              now=now)
-        if result:
-            results.append(result)
-    
+    with Manager() as manager:
+        semaphore = manager.BoundedSemaphore(1) # allow only 1 process at a time to make a request
+        exchange_client.semaphore = semaphore
+
+        print("running analysis")
+        with concurrent.futures.ProcessPoolExecutor(max_workers=3) as executor:
+            futures = []
+            for symbol in symbols:
+                futures.append(executor.submit(analyze_pair, 
+                                                ticker_data=ticker, 
+                                                exchange_client=exchange_client, 
+                                                now=now))
+            
+            results = [future.result() for future in tqdm(concurrent.futures.as_completed(futures)) if future.result()]
+        
     # results will become a DataFrame, so we only keep simple values, no lists/arrays 
     subset_results = [{key: value for key, value in result.items() if isinstance(value, (str, int, float))} for result in results]
 

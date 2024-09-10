@@ -30,6 +30,20 @@ def retry_decorator(max_retries=3, delay=1):
         return wrapper
     return decorator
 
+def semaphore_decorator():
+    """
+    A decorator to retry a function call in case of ConnectionError,
+    with access to the class instance (self).
+    """
+    def decorator(func):
+        def wrapper(self, *args, **kwargs):
+            # Use the provided semaphore if it's there, otherwise no-op (nullcontext)
+            with self.semaphore if self.semaphore else nullcontext():
+                return func(self, *args, **kwargs)
+        
+        return wrapper
+    return decorator
+
 # Metaclass to automatically apply the decorator
 class RetryMeta(type):
     def __new__(cls, name, bases, dct):
@@ -38,29 +52,8 @@ class RetryMeta(type):
                 dct[attr] = retry_decorator()(value)
         return super().__new__(cls, name, bases, dct)
 
-class SemaphoreDecorator:
-    _semaphore = None  # Class variable to hold the semaphore
-
-    @classmethod
-    def initialize_semaphore(cls, max_concurrent=1):
-        """Initialize the semaphore using a Manager."""
-        if cls._semaphore is None:
-            manager = Manager()
-            cls._semaphore = manager.BoundedSemaphore(max_concurrent)
-
-    @classmethod
-    def semaphore_limit(cls, func):
-        """Decorator to limit concurrent access using the semaphore."""
-        @wraps(func)
-        def wrapper(*args, **kwargs):
-            if cls._semaphore is None:
-                raise RuntimeError("Semaphore not initialized. Call initialize_semaphore() first.")
-            with cls._semaphore:
-                return func(*args, **kwargs)
-        return wrapper
-
 class Exchange(metaclass=RetryMeta):
-    def __init__(self, config_path: str):
+    def __init__(self, config_path, semaphore):
         if not os.path.exists(config_path):
             self.api_key = None
             self.api_secret = None
@@ -73,6 +66,7 @@ class Exchange(metaclass=RetryMeta):
         # Dynamically load API keys based on the class name (binance/mexc)
         self.api_key = config.get(self.__class__.__name__.lower(), {}).get('api_key')
         self.api_secret = config.get(self.__class__.__name__.lower(), {}).get('api_secret')
+        self.semaphore = semaphore
 
     def execute_market_order(self, symbol: str, side: str, quantity: float, dry_run: bool):
         if dry_run:
@@ -111,10 +105,10 @@ class Exchange(metaclass=RetryMeta):
         pass
 
 class Binance(Exchange):
-    def __init__(self, config_path=""):
-        super().__init__(config_path)
+    def __init__(self, config_path="", semaphore=None):
+        super().__init__(config_path, semaphore)
     
-    @SemaphoreDecorator.semaphore_limit
+    @semaphore_decorator
     def get_candles(self, symbol: str, interval: str, limit: int, startTime: int, endTime: int):
         candles = BinanceClient().get_klines(symbol=symbol, interval=interval, limit=limit, startTime=startTime, endTime=endTime)
         # time, open, high, low, close, volume
@@ -124,7 +118,7 @@ class Binance(Exchange):
         ]
         return formatted_candles
 
-    @SemaphoreDecorator.semaphore_limit
+    @semaphore_decorator
     def execute_market_order_internal(self, symbol: str, side: str, quantity: float):
         if side.upper() == "BUY":
             order = BinanceClient(self.api_key, self.api_secret).order_market_buy(symbol=symbol, quantity=quantity)
@@ -139,7 +133,7 @@ class Binance(Exchange):
 
         return {'price': final_price, 'order_obj': order}
     
-    @SemaphoreDecorator.semaphore_limit
+    @semaphore_decorator
     def get_ticker_data(self, symbol: str):
         return(BinanceClient().get_ticker(symbol=symbol, type="MINI"))
 
@@ -154,17 +148,17 @@ class Binance(Exchange):
     def get_taker_fee_fraction(self):
         return 0.075/100
 
-    @SemaphoreDecorator.semaphore_limit
+    @semaphore_decorator
     def get_all_ticker_data(self):
         return BinanceClient().get_ticker(type="MINI")
 
-    @SemaphoreDecorator.semaphore_limit
+    @semaphore_decorator
     def get_order_book(self, symbol, limit=100):
         return BinanceClient().get_order_book(symbol=symbol, limit=limit)
 
 class Mexc(Exchange):
-    def __init__(self, config_path: str):
-        super().__init__(config_path)
+    def __init__(self, config_path="", semaphore=None):
+        super().__init__(config_path, semaphore)
         # Initialize the MEXC client with API key and secret
         self.client = spot.HTTP(api_key=self.api_key, api_secret=self.api_secret)
 
