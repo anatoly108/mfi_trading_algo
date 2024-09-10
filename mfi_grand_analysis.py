@@ -9,13 +9,13 @@ from scipy.signal import find_peaks
 import argparse
 import os
 import sys
+from multiprocessing import BoundedSemaphore, Manager
 from mfi_functions import setup_logging, calculate_mfi, \
                             find_extrema, plot_asset, get_candles, MFI_TIMEINTERVAL, \
                             run_mfi_trading_algo, usd_to_quantity, VOL_THRESHOLD, \
                             calculate_liquidity_score, get_exchange_client, write_trading_results, \
                             MFI_TRADING_TIMEOUT_H, LOOKBACK_PERIOD_H, convert_to_unix, get_last_complete_time_for_candles
 from mfi_analysis import analyze_pair
-from exchanges import SemaphoreDecorator
 
 def generate_timepoints(start_date, end_date, hours):
     """
@@ -103,7 +103,7 @@ if __name__ == "__main__":
     logging.disable(logging.WARNING) # to avoid logging a lot of infos
 
     with Manager() as manager:
-        semaphore = manager.BoundedSemaphore(1) # allow only 1 process at a time to make a request
+        semaphore = manager.BoundedSemaphore(2) # allow only that many processes at a time to make a request
         exchange_client.semaphore = semaphore
 
         with concurrent.futures.ProcessPoolExecutor(max_workers=args.threads) as executor:

@@ -24,6 +24,12 @@ def retry_decorator(max_retries=3, delay=1):
                     attempt += 1
                     time.sleep(delay)
                 except Exception as e:
+                    if hasattr(e, 'code') and e.code == 429:  # Too Many Requests error code
+                        logging.warning(f"{func.__name__} {e.__class__.__name__}: {e}. Too many requests. Retrying... {attempt + 1}/{max_retries}")
+                        attempt += 1
+                        time.sleep(delay)
+                        continue
+                        
                     logging.error(f"An error occurred: {e}")
                     raise e
 
@@ -164,6 +170,7 @@ class Mexc(Exchange):
         # Initialize the MEXC client with API key and secret
         self.client = spot.HTTP(api_key=self.api_key, api_secret=self.api_secret)
 
+    @semaphore_decorator()
     def get_candles(self, symbol: str, interval: str, limit: int, startTime: int, endTime: int):
         # Fetch Kline/Candlestick data
         candles = self.client.klines(symbol=symbol, interval=interval, limit=limit, start_time=startTime, end_time=endTime)
@@ -174,6 +181,7 @@ class Mexc(Exchange):
         ]
         return formatted_candles
 
+    @semaphore_decorator()
     def execute_market_order_internal(self, symbol: str, side: str, quantity: float):
         # Place a market order
         order = self.client.create_order(symbol=symbol, side=side.upper(), order_type="MARKET", quantity=quantity)
@@ -197,15 +205,18 @@ class Mexc(Exchange):
 
         return {'price': final_price, 'order_obj': order_info}
 
+    @semaphore_decorator()
     def get_ticker_data(self, symbol: str):
         # Get 24-hour ticker data for a given symbol
         ticker = self.client.ticker_24h(symbol)
         return ticker
 
+    @semaphore_decorator()
     def get_all_ticker_data(self):
         tickers = self.client.ticker_24h()
         return tickers
 
+    @semaphore_decorator()
     def get_all_spot_usdt_pairs(self):
         # Fetch all trading pairs and filter for USDT pairs
         exchange_info = self.client.exchange_info()
@@ -218,5 +229,6 @@ class Mexc(Exchange):
     def get_taker_fee_fraction(self):
         return 0.02/100
 
+    @semaphore_decorator()
     def get_order_book(self, symbol, limit=100):
         return self.client.order_book(symbol=symbol, limit=limit)
