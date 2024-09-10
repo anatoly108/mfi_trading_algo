@@ -258,18 +258,12 @@ def plot_asset(asset_data, plot_suffix="", out_dir="out"):
     df["timestamp"] = pd.to_datetime(df["timestamp"], unit='ms')
     df.set_index("timestamp", inplace=True)
     df = df.astype(float)
-    df['EMA200'] = ta.EMA(df['close'], timeperiod=200)
-    df['EMA100'] = ta.EMA(df['close'], timeperiod=100)
-
-    # Create addplot objects for EMAs
-    ema200_plot = mpf.make_addplot(df['EMA200'], color='blue', width=1.0)
-    ema100_plot = mpf.make_addplot(df['EMA100'], color='red', width=1.0)
 
     # Create a figure with two subplots (one for the candlestick chart and one for MFI)
     fig, (ax1, ax2) = plt.subplots(2, 1, figsize=(24, 8), gridspec_kw={'height_ratios': [3, 1]})
 
     # Plot the candlestick chart on the first subplot
-    mpf.plot(df, type='line', ax=ax1, volume=False, show_nontrading=True, addplot=[ema200_plot, ema100_plot])
+    mpf.plot(df, type='line', ax=ax1, volume=False, show_nontrading=True)
 
     # Plot MFI on the second subplot
     ax2.plot(df.index, mfi, color='blue', label='MFI')
