@@ -8,6 +8,7 @@ from tqdm import tqdm
 from scipy.signal import find_peaks
 import argparse
 import os
+import talib as ta
 from multiprocessing import BoundedSemaphore, Manager
 import concurrent.futures
 from mfi_functions import setup_logging, calculate_mfi, \
