@@ -39,7 +39,7 @@ def generate_timepoints(start_date, end_date, hours):
     
     return timepoints
 
-def process_symbol(args, symbol, exchange_client, timepoint, out_directory_name):
+def process_symbol(args, symbol, exchange_client, out_directory_name):
     logging.info(f"Running for symbol {symbol}")
     end_date = get_last_complete_time_for_candles("1m")
     start_date = end_date - timedelta(hours=args.months_back * 30 * 24) # simplistic: assume month has 30 days 
@@ -114,7 +114,6 @@ if __name__ == "__main__":
                                             args=args, 
                                             symbol=symbol, 
                                             exchange_client=exchange_client, 
-                                            timepoint=timepoint,
                                             out_directory_name=out_directory_name))
             
             results = [future.result() for future in tqdm(concurrent.futures.as_completed(futures), total=len(futures))]
