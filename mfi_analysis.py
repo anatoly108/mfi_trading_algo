@@ -123,14 +123,19 @@ def calculate_ema_and_angle(candles):
     # Avoid division by zero
     price_range = max_price - min_price
     if price_range == 0:
-        ema100_normalized = 0
-        ema200_normalized = 0
+        ema100_latest_normalized = 0
+        ema200_latest_normalized = 0
+        ema100_start_normalized = 0
+        ema200_start_normalized = 0
     else:
         # Normalize EMA values to range 0-1
-        ema100_normalized = (ema100_latest - min_price) / price_range
-        ema200_normalized = (ema200_latest - min_price) / price_range
+        ema100_latest_normalized = (ema100_latest - min_price) / price_range
+        ema200_latest_normalized = (ema200_latest - min_price) / price_range
+        ema100_start_normalized = (ema100_start - min_price) / price_range
+        ema200_start_normalized = (ema200_start - min_price) / price_range
 
-    return ema100_start, ema100_latest, ema100_angle, ema100_normalized, ema100_start, ema200_latest, ema200_angle, ema200_normalized
+    return ema100_start, ema100_latest, ema100_angle, ema100_start_normalized, ema100_latest_normalized, \
+            ema100_start, ema200_latest, ema200_angle, ema200_start_normalized, ema200_latest_normalized
 
 def analyze_pair(ticker_data, exchange_client, now=None, do_calculate_liquidity_score=True):
     symbol = ticker_data["symbol"]
@@ -185,7 +190,8 @@ def analyze_pair(ticker_data, exchange_client, now=None, do_calculate_liquidity_
     volatility_score = calculate_volatility_range(candles)
     # this will be approximate because we can't calculate every single trade here
     quote_volume = np.sum([candle[4] * candle[5] for candle in candles])
-    ema100_start, ema100_latest, ema100_angle, ema100_normalized, ema100_start, ema200_latest, ema200_angle, ema200_normalized = calculate_ema_and_angle(candles)
+    ema100_start, ema100_latest, ema100_angle, ema100_start_normalized, ema100_latest_normalized, \
+            ema100_start, ema200_latest, ema200_angle, ema200_start_normalized, ema200_latest_normalized = calculate_ema_and_angle(candles)
 
     result_dict = {
         "symbol": symbol,
@@ -203,14 +209,16 @@ def analyze_pair(ticker_data, exchange_client, now=None, do_calculate_liquidity_
         "range_bound_score": range_bound_score,
         "volatility_score": volatility_score,
         "quote_volume": quote_volume,
-        "ema100_start":ema100_start, 
-        "ema100_latest":ema100_latest, 
-        "ema100_angle":ema100_angle, 
-        "ema100_normalized": ema100_normalized,
-        "ema100_start":ema100_start, 
-        "ema200_latest":ema200_latest,
-        "ema200_angle":ema200_angle,
-        "ema200_normalized": ema200_normalized
+        "ema100_start": ema100_start,
+        "ema100_latest": ema100_latest,
+        "ema100_angle": ema100_angle,
+        "ema100_start_normalized": ema100_start_normalized,
+        "ema100_latest_normalized": ema100_latest_normalized,
+        "ema100_start": ema100_start,
+        "ema200_latest": ema200_latest,
+        "ema200_angle": ema200_angle,
+        "ema200_start_normalized": ema200_start_normalized,
+        "ema200_latest_normalized": ema200_latest_normalized
     }
 
     if do_calculate_liquidity_score:
