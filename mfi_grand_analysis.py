@@ -15,6 +15,7 @@ from mfi_functions import setup_logging, calculate_mfi, \
                             calculate_liquidity_score, get_exchange_client, write_trading_results, \
                             MFI_TRADING_TIMEOUT_H, LOOKBACK_PERIOD_H, convert_to_unix, get_last_complete_time_for_candles
 from mfi_analysis import analyze_pair
+from exchanges import SemaphoreDecorator
 
 def generate_timepoints(start_date, end_date, hours):
     """
@@ -36,6 +37,38 @@ def generate_timepoints(start_date, end_date, hours):
         current_time -= timedelta(hours=hours)
     
     return timepoints
+
+def process_symbol(args, symbol, exchange_client, timepoint, out_directory_name):
+    logging.info(f"Running for symbol {symbol}")
+    end_date = get_last_complete_time_for_candles("1m")
+    start_date = end_date - timedelta(hours=args.months_back * 30 * 24) # simplistic: assume month has 30 days 
+
+    # important: timepoints are generated from most recent to oldest
+    timepoints = generate_timepoints(start_date, end_date, MFI_TRADING_TIMEOUT_H)
+    all_timepoint_results = []
+
+    for timepoint in tqdm(timepoints, desc="Timepoints", position=1, leave=False):
+        timepoint_results = analyze_pair(ticker_data={"symbol": symbol},
+                                        exchange_client=exchange_client,
+                                        now=timepoint,
+                                        do_calculate_liquidity_score=False)
+        if timepoint_results is None:
+            # not enough candles to cover history that far back
+            # that's where it's important that timepoints are generated from most recent to oldest
+            break
+
+        # timepoint_results is the "input" data that we use to trade next MFI_TRADING_TIMEOUT_H hours
+        # now, we need "output" data which is the trading results of the next MFI_TRADING_TIMEOUT_H hours
+        # we'll sumply get it with next timepoint_results because it will be MFI_TRADING_TIMEOUT_H shifted
+        # therefore it becomes a loop: every result is "output" of previous and "input" for next
+        timepoint_results["timepoint"] = convert_to_unix(timepoint)
+
+        # all_timepoint_results will become a DataFrame, so we only keep simple values, no lists/arrays 
+        timepoint_results_sub = {key: value for key, value in timepoint_results.items() if isinstance(value, (str, int, float))}
+        all_timepoint_results.append(timepoint_results_sub)
+
+    df = pd.DataFrame(all_timepoint_results)
+    df.to_csv(f"{out_directory_name}/{symbol}.csv", index=False)
 
 if __name__ == "__main__":
     parser = argparse.ArgumentParser(description="")
@@ -64,36 +97,18 @@ if __name__ == "__main__":
 
     logging.info(f"Script called with: {' '.join(sys.argv)}")
     logging.info(str(args))
-    for symbol in tqdm(symbols, desc="Symbols", position=0):
-        logging.info(f"Running for symbol {symbol}")
-        end_date = get_last_complete_time_for_candles("1m")
-        start_date = end_date - timedelta(hours=args.months_back * 30 * 24) # simplistic: assume month has 30 days 
-
-        # important: timepoints are generated from most recent to oldest
-        timepoints = generate_timepoints(start_date, end_date, MFI_TRADING_TIMEOUT_H)
-        all_timepoint_results = []
-        logging.disable(logging.WARNING) # to avoid logging a lot of infos
-        for timepoint in tqdm(timepoints, desc="Timepoints", position=1, leave=False):
-            timepoint_results = analyze_pair(ticker_data={"symbol": symbol},
-                                             exchange_client=exchange_client,
-                                             now=timepoint,
-                                             do_calculate_liquidity_score=False)
-            if timepoint_results is None:
-                # not enough candles to cover history that far back
-                # that's where it's important that timepoints are generated from most recent to oldest
-                break
-
-            # timepoint_results is the "input" data that we use to trade next MFI_TRADING_TIMEOUT_H hours
-            # now, we need "output" data which is the trading results of the next MFI_TRADING_TIMEOUT_H hours
-            # we'll sumply get it with next timepoint_results because it will be MFI_TRADING_TIMEOUT_H shifted
-            # therefore it becomes a loop: every result is "output" of previous and "input" for next
-            timepoint_results["timepoint"] = convert_to_unix(timepoint)
-
-            # all_timepoint_results will become a DataFrame, so we only keep simple values, no lists/arrays 
-            timepoint_results_sub = {key: value for key, value in timepoint_results.items() if isinstance(value, (str, int, float))}
-            all_timepoint_results.append(timepoint_results_sub)
-
-        logging.disable(logging.NOTSET)
-
-        df = pd.DataFrame(all_timepoint_results)
-        df.to_csv(f"{out_directory_name}/{symbol}.csv", index=False)
+    
+    SemaphoreDecorator.initialize_semaphore(1)
+    logging.disable(logging.WARNING) # to avoid logging a lot of infos
+    with concurrent.futures.ProcessPoolExecutor(max_workers=3) as executor:
+        futures = []
+        for symbol in symbols:
+            futures.append(executor.submit(process_symbol, 
+                                           args=args, 
+                                           symbol=symbol, 
+                                           exchange_client=exchange_client, 
+                                           timepoint=timepoint,
+                                           out_directory_name=out_directory_name))
+        
+        results = [future.result() for future in tqdm(concurrent.futures.as_completed(futures))]
+        

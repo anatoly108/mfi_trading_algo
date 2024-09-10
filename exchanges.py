@@ -38,6 +38,27 @@ class RetryMeta(type):
                 dct[attr] = retry_decorator()(value)
         return super().__new__(cls, name, bases, dct)
 
+class SemaphoreDecorator:
+    _semaphore = None  # Class variable to hold the semaphore
+
+    @classmethod
+    def initialize_semaphore(cls, max_concurrent=1):
+        """Initialize the semaphore using a Manager."""
+        if cls._semaphore is None:
+            manager = Manager()
+            cls._semaphore = manager.BoundedSemaphore(max_concurrent)
+
+    @classmethod
+    def semaphore_limit(cls, func):
+        """Decorator to limit concurrent access using the semaphore."""
+        @wraps(func)
+        def wrapper(*args, **kwargs):
+            if cls._semaphore is None:
+                raise RuntimeError("Semaphore not initialized. Call initialize_semaphore() first.")
+            with cls._semaphore:
+                return func(*args, **kwargs)
+        return wrapper
+
 class Exchange(metaclass=RetryMeta):
     def __init__(self, config_path: str):
         if not os.path.exists(config_path):
@@ -93,6 +114,7 @@ class Binance(Exchange):
     def __init__(self, config_path=""):
         super().__init__(config_path)
     
+    @SemaphoreDecorator.semaphore_limit
     def get_candles(self, symbol: str, interval: str, limit: int, startTime: int, endTime: int):
         candles = BinanceClient().get_klines(symbol=symbol, interval=interval, limit=limit, startTime=startTime, endTime=endTime)
         # time, open, high, low, close, volume
@@ -102,6 +124,7 @@ class Binance(Exchange):
         ]
         return formatted_candles
 
+    @SemaphoreDecorator.semaphore_limit
     def execute_market_order_internal(self, symbol: str, side: str, quantity: float):
         if side.upper() == "BUY":
             order = BinanceClient(self.api_key, self.api_secret).order_market_buy(symbol=symbol, quantity=quantity)
@@ -116,6 +139,7 @@ class Binance(Exchange):
 
         return {'price': final_price, 'order_obj': order}
     
+    @SemaphoreDecorator.semaphore_limit
     def get_ticker_data(self, symbol: str):
         return(BinanceClient().get_ticker(symbol=symbol, type="MINI"))
 
@@ -130,9 +154,11 @@ class Binance(Exchange):
     def get_taker_fee_fraction(self):
         return 0.075/100
 
+    @SemaphoreDecorator.semaphore_limit
     def get_all_ticker_data(self):
         return BinanceClient().get_ticker(type="MINI")
 
+    @SemaphoreDecorator.semaphore_limit
     def get_order_book(self, symbol, limit=100):
         return BinanceClient().get_order_book(symbol=symbol, limit=limit)
 
