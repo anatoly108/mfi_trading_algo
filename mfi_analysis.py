@@ -279,4 +279,4 @@ if __name__ == "__main__":
                       vol_threshold=args.vol_threshold,
                       symbols=symbols,
                       now=now,
-                      threads=threads)
+                      threads=args.threads)
