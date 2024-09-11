@@ -114,6 +114,7 @@ if __name__ == "__main__":
         # take symbols from a file
         with open(args.symbols_file, 'r') as file:
             symbols = [line.strip() for line in file]
+        symbols = [symbol for symbol in symbols if symbol != ""]
 
     # write to file which symbols it's operating on
     with open(f"{out_directory_name}/symbols.txt", 'w') as file:
