@@ -9,6 +9,7 @@ from scipy.signal import find_peaks
 import argparse
 import os
 import sys
+import time
 from multiprocessing import BoundedSemaphore, Manager
 import concurrent.futures
 from mfi_functions import setup_logging, calculate_mfi, \
@@ -40,7 +41,7 @@ def generate_timepoints(start_date, end_date, hours):
     return timepoints
 
 def process_symbol(args, symbol, exchange_client, out_directory_name, bar_pos):
-    setup_logging(log_dir = out_directory_name, file_suffix=f"{symbol}_", log_to_stdout=False)
+    setup_logging(log_dir = out_directory_name, file_suffix=f"{symbol}_", log_to_stdout=True)
 
     try:
         end_date = get_last_complete_time_for_candles("1m")
@@ -49,11 +50,11 @@ def process_symbol(args, symbol, exchange_client, out_directory_name, bar_pos):
         # important: timepoints are generated from most recent to oldest
         timepoints = generate_timepoints(start_date, end_date, MFI_TRADING_TIMEOUT_H)
         all_timepoint_results = []
+        iteration_times = []
 
-        for timepoint in tqdm(timepoints, desc=f"{symbol}", 
-                                          position=bar_pos, 
-                                          leave=False, 
-                                          bar_format='{desc}: ETA: {remaining} - Iteration Time: {rate_inv_fmt}s',):
+        for i, timepoint in enumerate(timepoints):
+            start_time = time.time()
+
             timepoint_results = analyze_pair(ticker_data={"symbol": symbol},
                                             exchange_client=exchange_client,
                                             now=timepoint,
@@ -73,8 +74,18 @@ def process_symbol(args, symbol, exchange_client, out_directory_name, bar_pos):
             timepoint_results_sub = {key: value for key, value in timepoint_results.items() if isinstance(value, (str, int, float))}
             all_timepoint_results.append(timepoint_results_sub)
 
+            end_time = time.time()
+            iteration_time = end_time - start_time
+            iteration_times.append(iteration_time)
+            if (i + 1) % 10 == 0:
+                average_time = sum(iteration_times) / len(iteration_times)
+                logging.info(f"{symbol} time per iteration: {average_time:.4f} seconds")
+
         df = pd.DataFrame(all_timepoint_results)
         df.to_csv(f"{out_directory_name}/{symbol}.csv", index=False)
+        total_time = sum(iteration_times) / 60
+        logging.info(f"Finished {symbol}, time elapsed: {total_time:.2f} minutes")
+
     except Exception as e:
         # if unexpected errors happen: log them, but don't break the program; we have enough data from other symbols
         logging.error(f"Symbol {symbol}, an error occurred: {e.__class__.__name__}: {e}")
