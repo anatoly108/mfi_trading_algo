@@ -136,8 +136,6 @@ if __name__ == "__main__":
         for symbol in symbols:
             file.write(f"{symbol}\n")
     
-    logging.disable(logging.INFO) # to avoid logging a lot of infos
-
     with Manager() as manager:
         semaphore = manager.BoundedSemaphore(2) # allow only that many processes at a time to make a request
         exchange_client.semaphore = semaphore
