@@ -50,7 +50,7 @@ def process_symbol(args, symbol, exchange_client, out_directory_name, bar_pos):
         timepoints = generate_timepoints(start_date, end_date, MFI_TRADING_TIMEOUT_H)
         all_timepoint_results = []
 
-        for timepoint in tqdm(timepoints, desc=f"Timepoints for {symbol}", position=bar_pos, leave=False):
+        for timepoint in tqdm(timepoints, desc=f"Timepoints for {symbol}", position=bar_pos, leave=False, bar_format='{desc}: ETA: {remaining} - Iteration Time: {elapsed_s}s',):
             timepoint_results = analyze_pair(ticker_data={"symbol": symbol},
                                             exchange_client=exchange_client,
                                             now=timepoint,
@@ -80,6 +80,7 @@ def process_symbol(args, symbol, exchange_client, out_directory_name, bar_pos):
 if __name__ == "__main__":
     parser = argparse.ArgumentParser(description="")
     parser.add_argument("--symbols", default=None, type=str)
+    parser.add_argument("--symbols_file", default=None, type=str)
     parser.add_argument("--months_back", default=6, type=int)
     parser.add_argument("--threads", default=os.cpu_count(), type=int)
     parser.add_argument("--exchange", required=False, default="binance")
@@ -87,13 +88,6 @@ if __name__ == "__main__":
     args = parser.parse_args()
 
     exchange_client = get_exchange_client(args.exchange)
-
-    symbols = None
-    if args.symbols is not None:
-        symbols = args.symbols.split(",")
-
-    if symbols is None:
-        symbols = exchange_client.get_all_spot_usdt_pairs()
 
     filename_suffix = datetime.now().strftime('%Y_%m_%d_%H_%M_%S')
     out_directory_name = f"out/{datetime.now().strftime('%Y_%m_%d')}/grand_analysis/{filename_suffix}_{exchange_client.__class__.__name__}"
@@ -106,6 +100,25 @@ if __name__ == "__main__":
 
     logging.info(f"Script called with: {' '.join(sys.argv)}")
     logging.info(str(args))
+
+    symbols = None
+    if args.symbols is not None:
+        # take symbols given by user in the command line
+        symbols = args.symbols.split(",")
+
+    if symbols is None and args.symbols_file is None:
+        # take all symbols from exchange
+        symbols = exchange_client.get_all_spot_usdt_pairs()
+
+    if args.symbols_file is not None:
+        # take symbols from a file
+        with open(args.symbols_file, 'r') as file:
+            symbols = [line.strip() for line in file]
+
+    # write to file which symbols it's operating on
+    with open(f"{out_directory_name}/symbols.txt", 'w') as file:
+        for symbol in symbols:
+            file.write(f"{symbol}\n")
     
     logging.disable(logging.INFO) # to avoid logging a lot of infos
 
