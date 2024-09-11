@@ -28,7 +28,8 @@ def run_mfi_trading_algo_wrapper(**kwargs):
 if __name__ == "__main__":
     parser = argparse.ArgumentParser(description="")
     parser.add_argument("--usdt_amount", required=True, help="USDT amount to operate with. Will be translated into corresponding asset's quantity", type=float)
-    parser.add_argument("--pnl_threshold", default=2, type=float)
+    parser.add_argument("--pnl_min", default=0, type=float)
+    parser.add_argument("--pnl_max", default=20, type=float)
     parser.add_argument("--liq_threshold", default=0, type=float)
     parser.add_argument("--n_assets_to_trade", default=10, type=int)
     parser.add_argument("--dry-run", action="store_true")
@@ -82,7 +83,10 @@ if __name__ == "__main__":
                                                           threads=args.threads)
         logging.disable(logging.NOTSET)
 
-        analysis_df_sub = analysis_df[(analysis_df.pnl >= args.pnl_threshold) & (analysis_df.liquidity_score > args.liq_threshold)]
+        analysis_df_sub = analysis_df[(analysis_df.pnl > args.pnl_min) & 
+                                      (analysis_df.pnl < args.pnl_max) & 
+                                      (analysis_df.liquidity_score > args.liq_threshold)]
+
         analysis_df_sub = analysis_df_sub.sort_values(by='total_profit', ascending=False)
         chosen_assets = list(analysis_df_sub["symbol"])[:min(analysis_df_sub.shape[0], args.n_assets_to_trade)]
 
