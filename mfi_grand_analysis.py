@@ -56,10 +56,12 @@ def process_symbol(args, symbol, exchange_client, out_directory_name, bar_pos):
         for i, timepoint in enumerate(timepoints):
             start_time = time.time()
 
+            logging.disable(logging.INFO) # to avoid logging a lot of infos
             timepoint_results = analyze_pair(ticker_data={"symbol": symbol},
                                             exchange_client=exchange_client,
                                             now=timepoint,
                                             do_calculate_liquidity_score=False)
+            logging.disable(logging.NOTSET)
             if timepoint_results is None:
                 # not enough candles to cover history that far back
                 # that's where it's important that timepoints are generated from most recent to oldest
