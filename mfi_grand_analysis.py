@@ -82,7 +82,7 @@ def process_symbol(args, symbol, exchange_client, out_directory_name, bar_pos):
             iteration_times.append(iteration_time)
             if (i + 1) % 10 == 0:
                 average_time = sum(iteration_times) / len(iteration_times)
-                logging.info(f"{symbol} time per iteration: {average_time:.4f} seconds")
+                logging.info(f"{symbol} time per iteration: {average_time:.4f} seconds, {i+1}/{len(timepoints)}")
 
         df = pd.DataFrame(all_timepoint_results)
         df.to_csv(f"{out_directory_name}/{symbol}.csv", index=False)
