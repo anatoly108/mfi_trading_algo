@@ -209,16 +209,11 @@ class Mexc(Exchange):
             order_info = self.client.query_order(symbol=symbol, order_id=order_id)
             tries += 1
 
-        return order_info
-        # final_price "price"
-
-        # Calculate final price from the fills (assuming `dealList` contains the execution details)
-        if 'dealList' in order_info and order_info['dealList']:
-            final_price = np.mean([float(deal['price']) for deal in order_info['dealList']])
-        else:
-            raise ValueError("No deal information found for the order.")
-
-        logging.info(f"Market {side} Order: {order_info}")
+        # order_info has "price", but it's just wrong: we calculate price from 
+        # "cummulativeQuoteQty" which final amounts in quote currency
+        quote_quantity = float(order_info["cummulativeQuoteQty"])
+        final_price = quote_quantity / quantity
+        logging.info(f"Market {side} order info: {order_info}")
 
         return {'price': final_price, 'order_obj': order_info}
 
