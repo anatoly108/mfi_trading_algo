@@ -42,6 +42,7 @@ def generate_timepoints(start_date, end_date, hours):
 
 def process_symbol(args, symbol, exchange_client, out_directory_name, bar_pos):
     setup_logging(log_dir = out_directory_name, file_suffix=f"{symbol}_", log_to_stdout=True)
+    logging.info(f"Starting {symbol}")
 
     try:
         end_date = get_last_complete_time_for_candles("1m")
