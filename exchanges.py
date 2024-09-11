@@ -184,16 +184,30 @@ class Mexc(Exchange):
     @semaphore_decorator()
     def execute_market_order_internal(self, symbol: str, side: str, quantity: float):
         # Place a market order
-        order = self.client.create_order(symbol=symbol, side=side.upper(), order_type="MARKET", quantity=quantity)
+        order = self.client.new_order(symbol=symbol, side=side.upper(), order_type="MARKET", quantity=quantity)
         
         # Get order_id from the response
         order_id = order['orderId']
 
         # Sleep for a short while to let the order be fully processed
-        sleep(1)  # Adjust the sleep duration as needed
+        time.sleep(1)  # Adjust the sleep duration as needed
 
         # Fetch the order details using the order_id
-        order_info = self.client.get_order(symbol=symbol, order_id=order_id)
+        order_info = self.client.query_order(symbol=symbol, order_id=order_id)
+
+        max_tries = 3
+        tries = 0
+        while order_info["status"] != "FILLED":
+            logging.info(f"Market {side} order not filled yet; waiting, current tries: {tries}")
+            if tries == max_tries:
+                raise Exception("Market order not filled.")
+            
+            time.sleep(1)
+            order_info = self.client.query_order(symbol=symbol, order_id=order_id)
+            tries += 1
+
+        return order_info
+        # final_price "price"
 
         # Calculate final price from the fills (assuming `dealList` contains the execution details)
         if 'dealList' in order_info and order_info['dealList']:
