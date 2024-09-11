@@ -83,7 +83,7 @@ class Exchange(metaclass=RetryMeta):
             logging.info(f"Dry run {side}")
             return {'price': None}
 
-        self.execute_market_order_internal(symbol, side, quantity)
+        return self.execute_market_order_internal(symbol, side, quantity)
 
     # Abstract methods to be implemented by child classes
     @abstractmethod
@@ -190,6 +190,7 @@ class Mexc(Exchange):
         
         # Get order_id from the response
         order_id = order['orderId']
+        logging.info(f"Market {side} order id {order_id}")
 
         # Sleep for a short while to let the order be fully processed
         time.sleep(1)  # Adjust the sleep duration as needed
