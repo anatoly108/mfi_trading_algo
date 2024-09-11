@@ -50,7 +50,7 @@ def process_symbol(args, symbol, exchange_client, out_directory_name, bar_pos):
         timepoints = generate_timepoints(start_date, end_date, MFI_TRADING_TIMEOUT_H)
         all_timepoint_results = []
 
-        for timepoint in tqdm(timepoints, desc=f"Timepoints for {symbol}", position=bar_pos, leave=True):
+        for timepoint in tqdm(timepoints, desc=f"Timepoints for {symbol}", position=bar_pos, leave=False):
             timepoint_results = analyze_pair(ticker_data={"symbol": symbol},
                                             exchange_client=exchange_client,
                                             now=timepoint,
