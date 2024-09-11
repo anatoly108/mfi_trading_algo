@@ -151,7 +151,7 @@ class Binance(Exchange):
         exchange_info = BinanceClient().get_exchange_info()
         usdt_pairs = [
             symbol['symbol'] for symbol in exchange_info['symbols']
-            if symbol['symbol'].endswith('USDT') and symbol['status'] == 'TRADING' and symbol['isSpotTradingAllowed']
+            if (symbol['symbol'].endswith('USDT') or symbol['symbol'].endswith('USDC'))  and symbol['status'] == 'TRADING' and symbol['isSpotTradingAllowed']
         ]
         return usdt_pairs
 
@@ -262,7 +262,7 @@ class Mexc(Exchange):
         if response.status_code == 200:
             symbols = response.json()["data"]["symbol"]
             symbols = [symbol.replace("_", "") for symbol in symbols]
-            symbols = [symbol for symbol in symbols if symbol.endswith("USDT")]
+            symbols = [symbol for symbol in symbols if (symbol.endswith("USDT") or symbol.endswith("USDC"))]
             return(symbols)
         else:
             raise Exception(f"Failed to fetch trading pairs. Status code: {response.status_code}, {response.json()}")
