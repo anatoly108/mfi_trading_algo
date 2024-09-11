@@ -149,11 +149,21 @@ class Binance(Exchange):
 
     def get_all_spot_usdt_pairs(self):
         exchange_info = BinanceClient().get_exchange_info()
-        usdt_pairs = [
-            symbol['symbol'] for symbol in exchange_info['symbols']
-            if (symbol['symbol'].endswith('USDT') or symbol['symbol'].endswith('USDC'))  and symbol['status'] == 'TRADING' and symbol['isSpotTradingAllowed']
-        ]
-        return usdt_pairs
+        usdt_pairs = []
+        usdc_pairs = []
+
+        # Separate USDT and USDC pairs
+        for symbol in exchange_info['symbols']:
+            if symbol['status'] == 'TRADING' and symbol['isSpotTradingAllowed']:
+                if symbol['symbol'].endswith('USDT'):
+                    usdt_pairs.append(symbol['symbol'])
+                elif symbol['symbol'].endswith('USDC'):
+                    usdc_pairs.append(symbol['symbol'])
+
+        # Now filter out USDC pairs that have a corresponding USDT pair
+        final_pairs = usdt_pairs + [usdc for usdc in usdc_pairs if usdc.replace('USDC', 'USDT') not in usdt_pairs]
+
+        return final_pairs
 
     def get_taker_fee_fraction(self):
         return 0.075/100
@@ -258,8 +268,15 @@ class Mexc(Exchange):
         if response.status_code == 200:
             symbols = response.json()["data"]["symbol"]
             symbols = [symbol.replace("_", "") for symbol in symbols]
-            symbols = [symbol for symbol in symbols if (symbol.endswith("USDT") or symbol.endswith("USDC"))]
-            return(symbols)
+
+            # Separate USDT and USDC pairs
+            usdt_symbols = [symbol for symbol in symbols if symbol.endswith("USDT")]
+            usdc_symbols = [symbol for symbol in symbols if symbol.endswith("USDC")]
+
+            # Keep USDC only if the corresponding USDT doesn't exist
+            final_symbols = usdt_symbols + [usdc for usdc in usdc_symbols if usdc.replace("USDC", "USDT") not in usdt_symbols]
+
+            return(final_symbols)
         else:
             raise Exception(f"Failed to fetch trading pairs. Status code: {response.status_code}, {response.json()}")
     
