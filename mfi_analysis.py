@@ -215,8 +215,15 @@ def analyze_pair(ticker_data, exchange_client, now=None, do_calculate_liquidity_
     }
 
     if do_calculate_liquidity_score:
-        liquidity_score = calculate_liquidity_score(symbol=symbol, exchange_client=exchange_client)
-        result_dict["liquidity_score"] = liquidity_score
+        try:
+            liquidity_score = calculate_liquidity_score(symbol=symbol, exchange_client=exchange_client)
+            result_dict["liquidity_score"] = liquidity_score
+        except Exception as e:
+            # liquidity score is the only function that deals with order book,
+            # and apparently unexpected errors might occur in connection with order books
+            # liquidity_score doesn't play important role as of now, so we only calculate it if it's possible
+            logging.error(f"Symbol {symbol}, calculate_liquidity_score error: {e.__class__.__name__}: {e}")
+            result_dict["liquidity_score"] = None
 
     # Add all ticker data, but update only keys that are not present in 
     for key, value in ticker_data.items():
@@ -229,8 +236,14 @@ def analyze_pair(ticker_data, exchange_client, now=None, do_calculate_liquidity_
 
     return result_dict
 
+def get_suffix_and_out_directory_name(exchange_client):
+    filename_suffix = datetime.now().strftime('%Y_%m_%d_%H_%M_%S')
+    out_directory_name = f"out/{datetime.now().strftime('%Y_%m_%d')}/analysis/{filename_suffix}_{exchange_client.__class__.__name__}"
+    return filename_suffix, out_directory_name
 
-def mfi_analysis_main(exchange_client, plot_all=False, short=False, symbols=None, no_vol_threshold=False, vol_threshold=VOL_THRESHOLD, now=None, threads=os.cpu_count()):
+def mfi_analysis_main(exchange_client, plot_all=False, short=False, symbols=None, no_vol_threshold=False, 
+                      vol_threshold=VOL_THRESHOLD, now=None, threads=os.cpu_count(), 
+                      filename_suffix=None, out_directory_name=None):
     if symbols is None:
         symbols = exchange_client.get_all_spot_usdt_pairs()
     
@@ -253,7 +266,7 @@ def mfi_analysis_main(exchange_client, plot_all=False, short=False, symbols=None
         semaphore = manager.BoundedSemaphore(2) # allow only that many processes at a time to make a request
         exchange_client.semaphore = semaphore
 
-        print("running analysis")
+        logging.info(f"Running analysis in {threads} threads")
         with concurrent.futures.ProcessPoolExecutor(max_workers=threads) as executor:
             futures = []
             for ticker in tickers_final:
@@ -273,8 +286,8 @@ def mfi_analysis_main(exchange_client, plot_all=False, short=False, symbols=None
     df = pd.DataFrame(subset_results)
     df = df.sort_values(by='total_profit', ascending=False)
 
-    filename_suffix = datetime.now().strftime('%Y_%m_%d_%H_%M_%S')
-    out_directory_name = f"out/{datetime.now().strftime('%Y_%m_%d')}/analysis/{filename_suffix}_{exchange_client.__class__.__name__}"
+    if out_directory_name is None and filename_suffix is None:
+        filename_suffix, out_directory_name = get_suffix_and_out_directory_name(exchange_client=exchange_client)
 
     # Create the directory if it doesn't exist
     if not os.path.exists(out_directory_name):
@@ -295,10 +308,11 @@ def mfi_analysis_main(exchange_client, plot_all=False, short=False, symbols=None
     results_flop = [res for res in results if res["symbol"] in list(flop_assets["symbol"])]
 
     if plot_all:
-        print("making all plots")
+        logging.info("Making all plots")
         for asset in tqdm(results):
             plot_asset(asset, "_analysis", out_dir=out_directory_name)
     else:
+        logging.info("Making top/flop plots")
         # Plotting each of the top 10 assets
         for asset in results_top:
             plot_asset(asset, "_analysis_top", out_dir=out_directory_name)
@@ -321,6 +335,11 @@ if __name__ == "__main__":
     args = parser.parse_args()
 
     exchange_client = get_exchange_client(args.exchange)
+
+    filename_suffix, out_directory_name = get_suffix_and_out_directory_name(exchange_client=exchange_client)
+    setup_logging(log_dir = out_directory_name)
+    logging.info(f"Script called with: {' '.join(sys.argv)}")
+    logging.info(str(args))
 
     symbols = None
     if args.symbols is not None:

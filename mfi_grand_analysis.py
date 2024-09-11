@@ -40,36 +40,42 @@ def generate_timepoints(start_date, end_date, hours):
     return timepoints
 
 def process_symbol(args, symbol, exchange_client, out_directory_name, bar_pos):
-    logging.info(f"Running for symbol {symbol}")
-    end_date = get_last_complete_time_for_candles("1m")
-    start_date = end_date - timedelta(hours=args.months_back * 30 * 24) # simplistic: assume month has 30 days 
+    setup_logging(log_dir = out_directory_name, file_suffix=f"{symbol}_", log_to_stdout=False)
 
-    # important: timepoints are generated from most recent to oldest
-    timepoints = generate_timepoints(start_date, end_date, MFI_TRADING_TIMEOUT_H)
-    all_timepoint_results = []
+    try:
+        end_date = get_last_complete_time_for_candles("1m")
+        start_date = end_date - timedelta(hours=args.months_back * 30 * 24) # simplistic: assume month has 30 days 
 
-    for timepoint in tqdm(timepoints, desc=f"Timepoints for {symbol}", position=bar_pos, leave=True):
-        timepoint_results = analyze_pair(ticker_data={"symbol": symbol},
-                                        exchange_client=exchange_client,
-                                        now=timepoint,
-                                        do_calculate_liquidity_score=False)
-        if timepoint_results is None:
-            # not enough candles to cover history that far back
-            # that's where it's important that timepoints are generated from most recent to oldest
-            break
+        # important: timepoints are generated from most recent to oldest
+        timepoints = generate_timepoints(start_date, end_date, MFI_TRADING_TIMEOUT_H)
+        all_timepoint_results = []
 
-        # timepoint_results is the "input" data that we use to trade next MFI_TRADING_TIMEOUT_H hours
-        # now, we need "output" data which is the trading results of the next MFI_TRADING_TIMEOUT_H hours
-        # we'll sumply get it with next timepoint_results because it will be MFI_TRADING_TIMEOUT_H shifted
-        # therefore it becomes a loop: every result is "output" of previous and "input" for next
-        timepoint_results["timepoint"] = convert_to_unix(timepoint)
+        for timepoint in tqdm(timepoints, desc=f"Timepoints for {symbol}", position=bar_pos, leave=True):
+            timepoint_results = analyze_pair(ticker_data={"symbol": symbol},
+                                            exchange_client=exchange_client,
+                                            now=timepoint,
+                                            do_calculate_liquidity_score=False)
+            if timepoint_results is None:
+                # not enough candles to cover history that far back
+                # that's where it's important that timepoints are generated from most recent to oldest
+                break
 
-        # all_timepoint_results will become a DataFrame, so we only keep simple values, no lists/arrays 
-        timepoint_results_sub = {key: value for key, value in timepoint_results.items() if isinstance(value, (str, int, float))}
-        all_timepoint_results.append(timepoint_results_sub)
+            # timepoint_results is the "input" data that we use to trade next MFI_TRADING_TIMEOUT_H hours
+            # now, we need "output" data which is the trading results of the next MFI_TRADING_TIMEOUT_H hours
+            # we'll sumply get it with next timepoint_results because it will be MFI_TRADING_TIMEOUT_H shifted
+            # therefore it becomes a loop: every result is "output" of previous and "input" for next
+            timepoint_results["timepoint"] = convert_to_unix(timepoint)
 
-    df = pd.DataFrame(all_timepoint_results)
-    df.to_csv(f"{out_directory_name}/{symbol}.csv", index=False)
+            # all_timepoint_results will become a DataFrame, so we only keep simple values, no lists/arrays 
+            timepoint_results_sub = {key: value for key, value in timepoint_results.items() if isinstance(value, (str, int, float))}
+            all_timepoint_results.append(timepoint_results_sub)
+
+        df = pd.DataFrame(all_timepoint_results)
+        df.to_csv(f"{out_directory_name}/{symbol}.csv", index=False)
+    except Exception as e:
+        # if unexpected errors happen: log them, but don't break the program; we have enough data from other symbols
+        logging.error(f"Symbol {symbol}, an error occurred: {e.__class__.__name__}: {e}")
+        return
 
 if __name__ == "__main__":
     parser = argparse.ArgumentParser(description="")
@@ -101,7 +107,7 @@ if __name__ == "__main__":
     logging.info(f"Script called with: {' '.join(sys.argv)}")
     logging.info(str(args))
     
-    logging.disable(logging.WARNING) # to avoid logging a lot of infos
+    logging.disable(logging.INFO) # to avoid logging a lot of infos
 
     with Manager() as manager:
         semaphore = manager.BoundedSemaphore(2) # allow only that many processes at a time to make a request

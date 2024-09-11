@@ -30,7 +30,7 @@ def retry_decorator(max_retries=3, delay=1):
                         time.sleep(delay)
                         continue
                         
-                    logging.error(f"An error occurred: {e}")
+                    logging.error(f"An error occurred: {func.__name__} {e.__class__.__name__}: {e}")
                     raise e
 
             raise Exception(f"Failed after {max_retries} attempts")
