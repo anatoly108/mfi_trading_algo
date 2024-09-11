@@ -7,6 +7,8 @@ import logging
 import numpy as np
 import requests
 import time
+import hashlib
+import hmac
 from contextlib import nullcontext
 
 def retry_decorator(max_retries=3, delay=1):
@@ -232,13 +234,38 @@ class Mexc(Exchange):
 
     @semaphore_decorator()
     def get_all_spot_usdt_pairs(self):
-        # Fetch all trading pairs and filter for USDT pairs
-        exchange_info = self.client.exchange_info()
-        usdt_pairs = [
-            symbol['symbol'] for symbol in exchange_info['symbols']
-            if symbol['quoteAsset'] == "USDT" and "SPOT" in symbol['permissions']
-        ]
-        return usdt_pairs
+
+        # Define the URL
+        url = 'https://www.mexc.com/open/api/v2/market/api_symbols'
+
+        # Generate current timestamp in milliseconds
+        req_time = str(int(time.time() * 1000))
+
+        # Create the signature string: accessKey + req_time
+        message = self.api_key + req_time
+
+        # Create the signature using HMAC-SHA256
+        signature = hmac.new(self.api_secret.encode(), message.encode(), hashlib.sha256).hexdigest()
+
+        # Prepare headers for the request
+        headers = {
+            'ApiKey': self.api_key,
+            'Request-Time': req_time,
+            'Signature': signature,
+            'Content-Type': 'application/json'
+        }
+
+        # Send the authenticated request
+        response = requests.get(url, headers=headers)
+
+        # Check the response
+        if response.status_code == 200:
+            symbols = response.json()["data"]["symbol"]
+            symbols = [symbol.replace("_", "") for symbol in symbols]
+            symbols = [symbol for symbol in symbols if symbol.endswith("USDT")]
+            return(symbols)
+        else:
+            raise Exception(f"Failed to fetch trading pairs. Status code: {response.status_code}, {response.json()}")
     
     def get_taker_fee_fraction(self):
         return 0.02/100
