@@ -352,6 +352,7 @@ if __name__ == "__main__":
     if args.now is not None:
         now = datetime.strptime(args.now, "%Y_%m_%d__%H_%M").replace(tzinfo=timezone.utc)
 
+    logging.disable(logging.INFO) # to avoid logging a lot of infos
     mfi_analysis_main(exchange_client=exchange_client,
                       plot_all=args.plot_all, 
                       no_vol_threshold=args.no_vol_threshold, 
