@@ -184,7 +184,9 @@ def analyze_pair(ticker_data, exchange_client, now=None, do_calculate_liquidity_
     range_bound_score = calculate_range_bound_score(candles)
     volatility_score = calculate_volatility_range(candles)
     # this will be approximate because we can't calculate every single trade here
-    quote_volume = np.sum([candle[4] * candle[5] for candle in candles])
+    # 24 * 60 = 1440 
+    candles_past_24h = candles[1440:]
+    quote_volume = np.sum([candle[4] * candle[5] for candle in candles_past_24h])
     ema100_start, ema100_latest, ema100_start_normalized, ema100_latest_normalized, \
     ema200_start, ema200_latest, ema200_start_normalized, ema200_latest_normalized = calculate_emas(candles)
 
