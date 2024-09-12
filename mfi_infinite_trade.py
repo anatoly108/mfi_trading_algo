@@ -16,7 +16,7 @@ from multiprocessing import current_process, Manager
 from mfi_functions import setup_logging, calculate_mfi, \
                             find_extrema, plot_asset, get_candles, MFI_TIMEINTERVAL, \
                             run_mfi_trading_algo, usd_to_quantity, termination_flag, get_exchange_client, \
-                            write_trading_results
+                            write_trading_results, VOL_THRESHOLD
 from mfi_analysis import mfi_analysis_main
 
 def run_mfi_trading_algo_wrapper(**kwargs):
@@ -30,10 +30,12 @@ if __name__ == "__main__":
     parser.add_argument("--usdt_amount", required=True, help="USDT amount to operate with. Will be translated into corresponding asset's quantity", type=float)
     parser.add_argument("--pnl_min", default=0, type=float)
     parser.add_argument("--pnl_max", default=20, type=float)
-    parser.add_argument("--liq_threshold", default=0, type=float)
+    parser.add_argument("--liq_min", default=0, type=float)
+    parser.add_argument("--liq_max", default=1e6, type=float)
     parser.add_argument("--n_assets_to_trade", default=10, type=int)
     parser.add_argument("--dry-run", action="store_true")
     parser.add_argument("--no_vol_threshold", action="store_true")
+    parser.add_argument("--vol_threshold", required=False, default=VOL_THRESHOLD, type=float)
     parser.add_argument("--symbols", default=None, type=str)
     parser.add_argument("--exchange", required=False, default="binance")
     parser.add_argument("--threads", default=os.cpu_count(), type=int)
@@ -80,12 +82,15 @@ if __name__ == "__main__":
         analysis_results, analysis_df = mfi_analysis_main(exchange_client=exchange_client,
                                                           symbols=symbols,
                                                           no_vol_threshold=args.no_vol_threshold,
-                                                          threads=args.threads)
+                                                          threads=args.threads,
+                                                          vol_threshold=args.vol_threshold)
         logging.disable(logging.NOTSET)
 
         analysis_df_sub = analysis_df[(analysis_df.pnl > args.pnl_min) & 
                                       (analysis_df.pnl < args.pnl_max) & 
-                                      (analysis_df.liquidity_score > args.liq_threshold)]
+                                      (analysis_df.liquidity_score > args.liq_min) &
+                                      (analysis_df.liquidity_score < args.liq_max) &
+                                      (analysis_df.volatility_score != 1)] # volatility_score = 1 are too crazy weird coins
 
         analysis_df_sub = analysis_df_sub.sort_values(by='total_profit', ascending=False)
         chosen_assets = list(analysis_df_sub["symbol"])[:min(analysis_df_sub.shape[0], args.n_assets_to_trade)]
