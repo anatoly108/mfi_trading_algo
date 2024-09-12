@@ -139,7 +139,7 @@ if __name__ == "__main__":
             file.write(f"{symbol}\n")
     
     with Manager() as manager:
-        semaphore = manager.BoundedSemaphore(2) # allow only that many processes at a time to make a request
+        semaphore = manager.BoundedSemaphore(3) # allow only that many processes at a time to make a request
         exchange_client.semaphore = semaphore
 
         with concurrent.futures.ProcessPoolExecutor(max_workers=args.threads) as executor:
