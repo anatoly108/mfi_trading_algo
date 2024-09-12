@@ -278,7 +278,13 @@ class Mexc(Exchange):
 
             return(final_symbols)
         else:
-            raise Exception(f"Failed to fetch trading pairs. Status code: {response.status_code}, {response.json()}")
+            res_text = ""
+            try:
+                res_rext = str(response.json())
+            except Exception:
+                pass
+
+            raise Exception(f"Failed to fetch trading pairs. Status code: {response.status_code}, {res_text}")
     
     def get_taker_fee_fraction(self):
         return 0.02/100
