@@ -39,6 +39,7 @@ if __name__ == "__main__":
     parser.add_argument("--symbols", default=None, type=str)
     parser.add_argument("--exchange", required=False, default="binance")
     parser.add_argument("--threads", default=os.cpu_count(), type=int)
+    parser.add_argument("--empty_candles_fraction", default=0.05, type=float)
 
     args = parser.parse_args()
 
@@ -90,7 +91,8 @@ if __name__ == "__main__":
                                       (analysis_df.pnl < args.pnl_max) & 
                                       (analysis_df.liquidity_score > args.liq_min) &
                                       (analysis_df.liquidity_score < args.liq_max) &
-                                      (analysis_df.volatility_score != 1)] # volatility_score = 1 are too crazy weird coins
+                                      (analysis_df.volatility_score != 1) &  # volatility_score = 1 are too crazy weird coins
+                                      (analysis_df.empty_candles_fraction <= args.empty_candles_fraction)]
 
         analysis_df_sub = analysis_df_sub.sort_values(by='total_profit', ascending=False)
         chosen_assets = list(analysis_df_sub["symbol"])[:min(analysis_df_sub.shape[0], args.n_assets_to_trade)]
