@@ -191,6 +191,9 @@ def analyze_pair(ticker_data, exchange_client, now=None, do_calculate_liquidity_
     ema100_start, ema100_latest, ema100_start_normalized, ema100_latest_normalized, \
     ema200_start, ema200_latest, ema200_start_normalized, ema200_latest_normalized = calculate_emas(candles)
 
+    empty_candles_number = np.sum([candle[5] == 0 for candle in candles_past_24h])
+    empty_candles_fraction = empty_candles_number / len(candles_past_24h)
+
     result_dict = {
         "symbol": symbol,
         "candles": candles,
@@ -207,6 +210,8 @@ def analyze_pair(ticker_data, exchange_client, now=None, do_calculate_liquidity_
         "range_bound_score": range_bound_score,
         "volatility_score": volatility_score,
         "quote_volume": quote_volume,
+        "empty_candles_number": empty_candles_number,
+        "empty_candles_fraction": empty_candles_fraction,
         "ema100_start": ema100_start,
         "ema100_latest": ema100_latest,
         "ema100_start_normalized": ema100_start_normalized,
