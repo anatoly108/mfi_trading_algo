@@ -398,6 +398,7 @@ def run_mfi_trading_algo(symbol, dry_run, exchange_client,
     bought = False
     really_new_candles = []
     total_profit = 0
+    total_profit_minus_fees = 0
     buy_signals = []
     sell_signals = []
     profits = []
@@ -416,14 +417,22 @@ def run_mfi_trading_algo(symbol, dry_run, exchange_client,
         if mfi_i < MFI_THRESHOLD_LOW and mfi_i < last_local_minima:
             # if last candle is below threshold, last_local_minima is set accordingly
             last_local_minima = mfi_i
-    
+
     while True:
+        if quantity == 0:
+            # can happen if asset is expensive and usdt_amount is small
+            logging.warning(f"Quantity equals 0. Breaking.")
+            # this if can also be outside of this loop (before it),
+            # but it's more convenient to have it here because then we won't have to
+            # repeat the part of the function after the loop 
+            break
+            
         if termination_flag.value:
-            logging.info(f"Process {current_process().pid}: Termination requested, finishing up.")
+            logging.warning(f"Process {current_process().pid}: Termination requested, finishing up.")
             if bought:
-                logging.info("Termination requested, but not sold yet. Waiting for sell signal.")
+                logging.warning("Termination requested, but not sold yet. Waiting for sell signal.")
             else:
-                logging.info("Termination requested, not bought. Breaking.")
+                logging.warning("Termination requested, not bought. Breaking.")
                 break
 
         iteration += 1
