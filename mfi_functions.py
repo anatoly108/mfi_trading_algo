@@ -128,7 +128,21 @@ def calculate_liquidity_score(symbol, exchange_client, is_setup=False):
     return normalized_score
 
 def usd_to_quantity(usdt_amount, current_price):
-    return(round(usdt_amount / current_price))
+    initial_quantity = usdt_amount / current_price
+    rounded_quantity = round(initial_quantity)
+    
+    # Calculate the actual USDT value after rounding
+    resulting_usdt = rounded_quantity * current_price
+    
+    # Check if the difference is greater than 10%
+    for digits_n in [1,2]: # allow max 2 digits after comma
+        if abs(resulting_usdt - usdt_amount) > 0.1 * usdt_amount:
+            rounded_quantity = round(initial_quantity, digits_n)
+            resulting_usdt = rounded_quantity * current_price
+        else:
+            break
+    
+    return rounded_quantity
 
 def convert_to_unix(date_obj):
     return int(date_obj.timestamp() * 1000)
