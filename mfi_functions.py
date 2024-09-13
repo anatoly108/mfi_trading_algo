@@ -135,7 +135,9 @@ def usd_to_quantity(usdt_amount, current_price):
     resulting_usdt = rounded_quantity * current_price
     
     # Check if the difference is greater than 10%
-    for digits_n in [1,2]: # allow max 2 digits after comma
+    for digits_n in [1,2,3]: # allow max 3 digits after comma
+        # allowed digits after comma depend on specific assets,
+        # but this function will return any digits after comma only for expensive assets
         if abs(resulting_usdt - usdt_amount) > 0.1 * usdt_amount:
             rounded_quantity = round(initial_quantity, digits_n)
             resulting_usdt = rounded_quantity * current_price
