@@ -1,6 +1,6 @@
 import pandas as pd
 import numpy as np
-import talib as ta
+import talib
 import requests
 import logging
 from datetime import datetime, timedelta
@@ -9,7 +9,7 @@ from scipy.signal import find_peaks
 import argparse
 import os
 import sys
-import talib as ta
+from scipy import stats
 from multiprocessing import BoundedSemaphore, Manager
 import concurrent.futures
 from mfi_functions import setup_logging, calculate_mfi, \
@@ -97,8 +97,8 @@ def calculate_emas(candles):
     close_prices = np.array([candle[4] for candle in candles], dtype=float)
     
     # Calculate EMA200 and EMA100 using TA-Lib
-    ema200 = ta.EMA(close_prices, timeperiod=200)
-    ema100 = ta.EMA(close_prices, timeperiod=100)
+    ema200 = talib.EMA(close_prices, timeperiod=200)
+    ema100 = talib.EMA(close_prices, timeperiod=100)
 
     if ema200 is None or ema100 is None:
         return None, None, None, None, \
@@ -132,6 +132,138 @@ def calculate_emas(candles):
 
     return ema100_start, ema100_latest, ema100_start_normalized, ema100_latest_normalized, \
             ema200_start, ema200_latest, ema200_start_normalized, ema200_latest_normalized
+
+def calculate_win_rate(profits):
+    winning_trades = [profit for profit in profits if profit > 0]
+    total_trades = len(profits)
+    if total_trades == 0:
+        return 0.0
+    win_rate = len(winning_trades) / total_trades
+    return win_rate * 100  # Return as a percentage
+
+def calculate_average_trade_profit(total_profit, total_trades):
+    if total_trades == 0:
+        return 0.0
+    average_profit = total_profit / total_trades
+    return average_profit
+
+def calculate_max_drawdown(profits):
+    if len(profits) < 2:
+        return 0.0
+    cumulative_profits = np.cumsum(profits)
+    running_max = np.maximum.accumulate(cumulative_profits)
+    drawdowns = running_max - cumulative_profits
+    max_drawdown = drawdowns.max()
+    return max_drawdown
+
+def calculate_sharpe_ratio(profits):
+    if len(profits) < 2:
+        return 0.0
+    average_return = np.mean(profits)
+    return_std = np.std(profits)
+    if return_std == 0:
+        return 0.0
+    sharpe_ratio = average_return / return_std
+    return sharpe_ratio
+
+def calculate_profit_factor(profits):
+    gross_profit = sum([profit for profit in profits if profit > 0])
+    gross_loss = -sum([profit for profit in profits if profit < 0])
+    if gross_loss == 0:
+        return float('inf')  # Infinite profit factor
+    profit_factor = gross_profit / gross_loss
+    return profit_factor
+
+def calculate_average_holding_time_and_time_in_market(buy_signals, sell_signals, candles):
+    holding_times = []
+    total_holding_time = 0
+    for buy, sell in zip(buy_signals, sell_signals):
+        holding_time = sell - buy
+        holding_times.append(holding_time)
+        total_holding_time += holding_time
+    if len(holding_times) == 0:
+        return 0.0, 0.0
+    average_holding_time = np.mean(holding_times)
+    time_in_market = total_holding_time / len(candles)
+    return average_holding_time, time_in_market
+
+def calculate_atr(candles, period=14):
+    high_prices = np.array([candle[2] for candle in candles], dtype=float)
+    low_prices = np.array([candle[3] for candle in candles], dtype=float)
+    close_prices = np.array([candle[4] for candle in candles], dtype=float)
+    atr = talib.ATR(high_prices, low_prices, close_prices, timeperiod=period)
+    return atr[-1] if atr.size > 0 else 0.0
+
+def calculate_rsi(candles, period=14):
+    close_prices = np.array([candle[4] for candle in candles], dtype=float)
+    rsi = talib.RSI(close_prices, timeperiod=period)
+    return rsi[-1] if rsi.size > 0 else 0.0
+
+def calculate_bollinger_bands_width(candles, period=20, num_std_dev=2):
+    close_prices = np.array([candle[4] for candle in candles], dtype=float)
+    upper_band, middle_band, lower_band = talib.BBANDS(
+        close_prices, timeperiod=period, nbdevup=num_std_dev, nbdevdn=num_std_dev, matype=0)
+    if middle_band[-1] == 0:
+        return 0.0
+    bb_width = (upper_band[-1] - lower_band[-1]) / middle_band[-1]
+    return bb_width
+
+def calculate_rate_of_change(candles, period=14):
+    close_prices = np.array([candle[4] for candle in candles], dtype=float)
+    roc = talib.ROCP(close_prices, timeperiod=period)
+    return roc[-1] * 100 if roc.size > 0 else 0.0  # Convert to percentage
+
+def calculate_std_dev_returns(profits):
+    if len(profits) < 2:
+        return 0.0
+    std_dev = np.std(profits)
+    return std_dev
+
+def calculate_skewness(profits):
+    if len(profits) < 3:
+        return 0.0
+    skewness = stats.skew(profits)
+    return skewness
+
+def calculate_kurtosis(profits):
+    if len(profits) < 4:
+        return 0.0
+    kurtosis = stats.kurtosis(profits)
+    return kurtosis
+
+def calculate_vwap(candles):
+    high_prices = np.array([candle[2] for candle in candles], dtype=float)
+    low_prices = np.array([candle[3] for candle in candles], dtype=float)
+    close_prices = np.array([candle[4] for candle in candles], dtype=float)
+    volumes = np.array([candle[5] for candle in candles], dtype=float)
+    typical_prices = (high_prices + low_prices + close_prices) / 3
+    total_volume = np.sum(volumes)
+    if total_volume == 0:
+        return 0.0
+    vwap = np.sum(typical_prices * volumes) / total_volume
+    return vwap
+
+def calculate_average_daily_volume(candles, period_days=1):
+    volumes = np.array([candle[5] for candle in candles], dtype=float)
+    period_candles = period_days * 1440  # Assuming 1-minute candles
+    if len(volumes) < period_candles:
+        period_candles = len(volumes)
+    avg_volume = np.mean(volumes[-period_candles:])
+    return avg_volume
+
+def calculate_volume_volatility(candles, period_days=1):
+    volumes = np.array([candle[5] for candle in candles], dtype=float)
+    period_candles = period_days * 1440
+    if len(volumes) < period_candles:
+        period_candles = len(volumes)
+    volume_std_dev = np.std(volumes[-period_candles:])
+    return volume_std_dev
+
+def calculate_macd(candles, fast_period=12, slow_period=26, signal_period=9):
+    close_prices = np.array([candle[4] for candle in candles], dtype=float)
+    macd, macd_signal, macd_hist = talib.MACD(
+        close_prices, fastperiod=fast_period, slowperiod=slow_period, signalperiod=signal_period)
+    return macd[-1], macd_signal[-1], macd_hist[-1]
 
 def analyze_pair(ticker_data, exchange_client, now=None, do_calculate_liquidity_score=True):
     symbol = ticker_data["symbol"]
@@ -176,9 +308,10 @@ def analyze_pair(ticker_data, exchange_client, now=None, do_calculate_liquidity_
     buy_signals = trading_results["buy_signals"]
     sell_signals = trading_results["sell_signals"]
 
-    trades_num = len(buy_signals) * 2
+    trades_num = len(sell_signals)
+    orders_num = len(buy_signals) * 2
     fee_per_trade = exchange_client.get_taker_fee_fraction()
-    fees = fee_per_trade*trades_num*usdt
+    fees = fee_per_trade*orders_num*usdt
     total_profit_minus_fees = trading_results["total_profit"] - fees
 
     asset_price_change = round((1 - candles[0][4]/candles[-1][4]) * 100, 1)
@@ -193,6 +326,8 @@ def analyze_pair(ticker_data, exchange_client, now=None, do_calculate_liquidity_
 
     empty_candles_number = np.sum([candle[5] == 0 for candle in candles_past_24h])
     empty_candles_fraction = empty_candles_number / len(candles_past_24h)
+    macd_line, signal_line, macd_histogram = calculate_macd(candles)
+    average_holding_time, time_in_market = calculate_average_holding_time_and_time_in_market(buy_signals, sell_signals, candles=candles_part2)
 
     result_dict = {
         "symbol": symbol,
@@ -205,12 +340,33 @@ def analyze_pair(ticker_data, exchange_client, now=None, do_calculate_liquidity_
         "total_profit_minus_fees": round(total_profit_minus_fees, 1),
         "pnl": round((trading_results["total_profit"]/usdt)*100, 1),
         "fees": fees,
+        "orders_num": orders_num,
         "trades_num": trades_num,
         "asset_price_change": asset_price_change,
         "range_bound_score": range_bound_score,
         "volatility_score": volatility_score,
         "quote_volume": quote_volume,
         "empty_candles_number": empty_candles_number,
+        "win_rate": calculate_win_rate(trading_results["profits"]),
+        "average_trade_profit": calculate_average_trade_profit(trading_results["total_profit"], trades_num),
+        "max_drawdown": calculate_max_drawdown(trading_results["profits"]),
+        "sharpe_ratio": calculate_sharpe_ratio(trading_results["profits"]),
+        "profit_factor": calculate_profit_factor(trading_results["profits"]),
+        "average_holding_time": average_holding_time,
+        "time_in_market": time_in_market,
+        "atr": calculate_atr(candles),
+        "rsi": calculate_rsi(candles),
+        "bb_width": calculate_bollinger_bands_width(candles),
+        "roc": calculate_rate_of_change(candles),
+        "std_dev_returns": calculate_std_dev_returns(trading_results["profits"]),
+        "skewness": calculate_skewness(trading_results["profits"]),
+        "kurtosis": calculate_kurtosis(trading_results["profits"]),
+        "vwap": calculate_vwap(candles),
+        "average_daily_volume": calculate_average_daily_volume(candles),
+        "volume_volatility": calculate_volume_volatility(candles),
+        "macd_line": macd_line, 
+        "signal_line": signal_line, 
+        "macd_histogram": macd_histogram,
         "empty_candles_fraction": empty_candles_fraction,
         "ema100_start": ema100_start,
         "ema100_latest": ema100_latest,
