@@ -35,7 +35,8 @@ VOL_THRESHOLD = 100e3
 # Global termination flag
 termination_flag = multiprocessing.Value('i', 0)
 
-btc_liquidity_score_raw = None
+btc_trading_volume = None
+order_book_depth_btc = None
 
 # Signal handler to set the termination flag
 def signal_handler(sig, frame):
@@ -91,41 +92,67 @@ def get_exchange_client(exchange_name):
     logging.info(f"Exchange is set to: {exchange_client.__class__.__name__}")
     return exchange_client
 
-def calculate_liquidity_score(symbol, exchange_client, is_setup=False):
-    global btc_liquidity_score_raw
-    if btc_liquidity_score_raw is None and not is_setup:
+def get_order_book_depth(symbol, exchange_client):
+    order_book = exchange_client.get_order_book(symbol=symbol, limit=500)
+    bids = order_book['bids']
+    asks = order_book['asks']
+
+    best_bid = float(bids[0][0])
+    best_ask = float(asks[0][0])
+    mid_price = (best_bid + best_ask) / 2
+    price_range_low = mid_price * 0.99
+    price_range_high = mid_price * 1.01
+
+    bid_depth = sum(float(bid[1]) for bid in bids if float(bid[0]) >= price_range_low)
+    ask_depth = sum(float(ask[1]) for ask in asks if float(ask[0]) <= price_range_high)
+    total_depth = bid_depth + ask_depth
+
+    # Convert depth to USD value
+    total_depth_usd = total_depth * mid_price
+    return total_depth_usd, best_bid, best_ask
+
+def calculate_liquidity_score(symbol, exchange_client):
+    global btc_trading_volume
+    global order_book_depth_btc
+    if btc_trading_volume is None and order_book_depth_btc is None:
         # use BTC as the thing with highest liquidity
-        btc_liquidity_score_raw = calculate_liquidity_score(symbol="BTCUSDT", exchange_client=exchange_client, is_setup=True)
+        ticker_btc = exchange_client.get_ticker_data(symbol="BTCUSDT")
+        btc_trading_volume = float(ticker_btc['quoteVolume'])
+        order_book_depth_btc, best_bid_btc, best_ask_btc = get_order_book_depth("BTCUSDT", exchange_client)
 
-    # Step 1: Get 24-hour ticker for trading volume
-    ticker = exchange_client.get_ticker_data(symbol=symbol)
-    trading_volume = float(ticker['quoteVolume'])  # This is the trading volume in USDT
+    # Step 1: Get trading volume for the symbol and BTCUSDT
+    ticker_symbol = exchange_client.get_ticker_data(symbol=symbol)
+    trading_volume_symbol = float(ticker_symbol['quoteVolume'])
 
-    # Step 2: Calculate Market Capitalization
-    # not available at the moment
+    # Normalize trading volume
+    normalized_trading_volume = trading_volume_symbol / btc_trading_volume
 
-    # Step 3: Calculate Order Book Depth (using 5% of the price range as an example)
-    order_book = exchange_client.get_order_book(symbol=symbol, limit=200)
-    bids = sum(float(bid[1]) for bid in order_book['bids'])  # Summing the volumes of buy orders
-    asks = sum(float(ask[1]) for ask in order_book['asks'])  # Summing the volumes of sell orders
-    order_book_depth = bids + asks  # Total order book depth
+    # Step 2: Get order book depth within 1% of the mid-price
+    order_book_depth_symbol, best_bid, best_ask = get_order_book_depth(symbol, exchange_client)
 
-    # Step 4: Calculate Bid-Ask Spread
-    best_bid = float(order_book['bids'][0][0])
-    best_ask = float(order_book['asks'][0][0])
-    bid_ask_spread = (best_ask - best_bid) / best_bid * 100  # Bid-ask spread in percentage
+    # Normalize order book depth
+    normalized_order_book_depth = order_book_depth_symbol / order_book_depth_btc
 
-    # Step 5: Calculate Liquidity Score
-    liquidity_score = (0.3 * trading_volume) + (0.5 * order_book_depth) + (0.2 * (1 / (1 + bid_ask_spread)))
-    # original formula with market cap:
-    # liquidity_score = (0.4 * trading_volume) + (0.3 * market_cap) + (0.1 * order_book_depth) + (0.2 * (1 / (1 + bid_ask_spread)))
+    # Step 3: Calculate and normalize bid-ask spread
+    bid_ask_spread = (best_ask - best_bid) / best_bid * 100  # Percentage
 
-    # Step 6: Normalization (optional, for a max score of 100)
-    if is_setup:
-        return liquidity_score
-    
-    normalized_score = (liquidity_score / btc_liquidity_score_raw) * 100
-    return normalized_score
+    # Normalize bid-ask spread (lower spread gets higher score)
+    max_spread = 5.0  # Maximum expected spread in percentage
+    min_spread = 0.01  # Minimum expected spread in percentage
+    capped_spread = min(max(bid_ask_spread, min_spread), max_spread)
+    normalized_bid_ask_spread = (max_spread - capped_spread) / (max_spread - min_spread)
+
+    # Step 4: Combine normalized components
+    liquidity_score = (
+        normalized_trading_volume +
+        normalized_order_book_depth +
+        normalized_bid_ask_spread
+    ) / 3  # Average of the components
+
+    # Scale the liquidity score to be between 0 and 100
+    liquidity_score *= 100
+
+    return liquidity_score
 
 def usd_to_quantity(usdt_amount, current_price):
     initial_quantity = usdt_amount / current_price

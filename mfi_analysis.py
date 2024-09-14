@@ -271,7 +271,7 @@ def mfi_analysis_main(exchange_client, plot_all=False, short=False, symbols=None
                 tickers_final.append(ticker)
 
     with Manager() as manager:
-        semaphore = manager.BoundedSemaphore(3) # allow only that many processes at a time to make a request
+        semaphore = manager.BoundedSemaphore(4) # allow only that many processes at a time to make a request
         exchange_client.semaphore = semaphore
 
         logging.info(f"Running analysis in {threads} threads")
@@ -364,4 +364,6 @@ if __name__ == "__main__":
                       vol_threshold=args.vol_threshold,
                       symbols=symbols,
                       now=now,
-                      threads=args.threads)
+                      threads=args.threads,
+                      filename_suffix=filename_suffix,
+                      out_directory_name=out_directory_name)
