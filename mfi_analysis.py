@@ -325,7 +325,7 @@ def analyze_pair(ticker_data, exchange_client, now=None, do_calculate_liquidity_
     ema200_start, ema200_latest, ema200_start_normalized, ema200_latest_normalized = calculate_emas(candles)
 
     empty_candles_number = np.sum([candle[5] == 0 for candle in candles_past_24h])
-    empty_candles_fraction = empty_candles_number / len(candles_past_24h)
+    empty_candles_fraction = (empty_candles_number / len(candles_past_24h)) if len(candles_past_24h) > 0 else 0
     macd_line, signal_line, macd_histogram = calculate_macd(candles)
     average_holding_time, time_in_market = calculate_average_holding_time_and_time_in_market(buy_signals, sell_signals, candles=candles_part2)
 
@@ -346,7 +346,6 @@ def analyze_pair(ticker_data, exchange_client, now=None, do_calculate_liquidity_
         "range_bound_score": range_bound_score,
         "volatility_score": volatility_score,
         "quote_volume": quote_volume,
-        "empty_candles_number": empty_candles_number,
         "win_rate": calculate_win_rate(trading_results["profits"]),
         "average_trade_profit": calculate_average_trade_profit(trading_results["total_profit"], trades_num),
         "max_drawdown": calculate_max_drawdown(trading_results["profits"]),
@@ -367,6 +366,7 @@ def analyze_pair(ticker_data, exchange_client, now=None, do_calculate_liquidity_
         "macd_line": macd_line, 
         "signal_line": signal_line, 
         "macd_histogram": macd_histogram,
+        "empty_candles_number": empty_candles_number,
         "empty_candles_fraction": empty_candles_fraction,
         "ema100_start": ema100_start,
         "ema100_latest": ema100_latest,
@@ -444,7 +444,7 @@ def mfi_analysis_main(exchange_client, plot_all=False, short=False, symbols=None
     exchange_client.semaphore = None # remove semaphore: otherwise it will hang indefinitely when manager is closed
     
     # results will become a DataFrame, so we only keep simple values, no lists/arrays 
-    subset_results = [{key: value for key, value in result.items() if isinstance(value, (str, int, float))} for result in results]
+    subset_results = [{key: value for key, value in result.items() if isinstance(value, (str, int, float, np.integer, np.floating))} for result in results]
 
     # Create a DataFrame from the subset results
     df = pd.DataFrame(subset_results)
