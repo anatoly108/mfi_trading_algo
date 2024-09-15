@@ -208,12 +208,11 @@ def get_last_complete_time_for_candles(interval):
     
     return last_complete_time
 
-def calculate_num_candles(interval, startTime, endTime):
-    interval_seconds = 0
+def get_seconds_for_an_interval(interval):
     if interval.endswith('m'):  # Minute intervals
-        interval_seconds = int(interval[:-1]) * 60
+        interval_seconds = int(interval.replace("m", "")) * 60
     elif interval.endswith('h'):  # Hour intervals
-        interval_seconds = int(interval[:-1]) * 3600
+        interval_seconds = int(interval.replace("h", "")) * 3600
     elif interval == '1d':  # 1 day interval
         interval_seconds = 86400
     elif interval == '3d':  # 3 days interval
@@ -227,10 +226,14 @@ def calculate_num_candles(interval, startTime, endTime):
     else:
         raise ValueError("Unsupported interval")
 
+    return interval_seconds
+
+def calculate_num_candles(interval, startTime, endTime):
+    interval_seconds = get_seconds_for_an_interval(interval)
+
     total_seconds = (endTime - startTime).total_seconds()
     num_candles = int(total_seconds // interval_seconds)
     return num_candles
-
 
 # note: this will return only complete candles!
 # startTime and endTime are datetime objects, easiest way to specify: datetime.strptime("2024-01-01 00:00:00", "%Y-%m-%d %H:%M:%S")
@@ -252,8 +255,9 @@ def get_candles(symbol, interval, exchange_client, startTime=None, endTime=None,
     endTimeUnix = convert_to_unix(endTime.replace(tzinfo=timezone.utc)) + 1
 
     num_candles = calculate_num_candles(interval, startTime, endTime)
+    seconds_for_interval = get_seconds_for_an_interval(interval)
 
-    while len(all_candles) < num_candles:
+    while len(all_candles) < num_candles and startTimeUnix < endTimeUnix:
         current_limit = min(limit, num_candles - len(all_candles))
         candles = exchange_client.get_candles(symbol=symbol,
                                              interval=interval,
@@ -262,7 +266,12 @@ def get_candles(symbol, interval, exchange_client, startTime=None, endTime=None,
                                              limit=current_limit) # Fetch only the remaining needed candles
         
         if not candles:
-            break
+            # no candles for given time frame
+            # since candles fetching starts from startTime, this means 
+            # we need to increate startTime until we find candles
+            startTimeUnix += (500 * seconds_for_interval) * 1000
+            # this will increase startTimeUnix by 500 candles
+            continue
         
         all_candles.extend(candles)
         

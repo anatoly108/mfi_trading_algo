@@ -51,6 +51,9 @@ def process_symbol(args, symbol, exchange_client, out_directory_name, start_date
                             exchange_client=exchange_client,
                             startTime=start_date,
                             endTime=end_date)
+        if len(candles) == 0:
+            logging.warning(f"{symbol} no candles")
+            return
 
         df = pd.DataFrame(candles)
         df.columns = ["time", "open", "high", "low", "close", "volume"]
