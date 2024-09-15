@@ -296,7 +296,7 @@ def analyze_pair(ticker_data, exchange_client, now=None, do_calculate_liquidity_
     # next, emulate a situation where only LOOKBACK_PERIOD_H candles is known
     part1_of_candles_num = LOOKBACK_PERIOD_H * 60
     part2_of_candles_num = part1_of_candles_num + 1 # MFI_TRADING_TIMEOUT_H * 60
-    candles_part1 = candles[:part1_of_candles_num]
+    candles_part1 = candles[:(part1_of_candles_num+1)]
     candles_part2 = candles[part2_of_candles_num:]
     # just get the next candle from candles_part2
     get_new_candles_for_analysis = lambda symbol, interval, last_candle_timestamp, exchange_client: next(
