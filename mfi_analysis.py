@@ -16,7 +16,7 @@ from mfi_functions import setup_logging, calculate_mfi, \
                             find_extrema, plot_asset, get_candles, MFI_TIMEINTERVAL, \
                             run_mfi_trading_algo, usd_to_quantity, VOL_THRESHOLD, \
                             calculate_liquidity_score, get_exchange_client, write_trading_results, \
-                            MFI_TRADING_TIMEOUT_H, LOOKBACK_PERIOD_H
+                            MFI_TRADING_TIMEOUT_H, LOOKBACK_PERIOD_H, check_if_candles_are_consistent
 
 def convert_to_millions(volume):
     # Convert the volume to millions
@@ -280,13 +280,9 @@ def analyze_pair(ticker_data, exchange_client, now=None, do_calculate_liquidity_
         # not enough candles: history doesn't go that far back
         return None
 
-    candles_times = np.array([candle[0] for candle in candles])
-    candles_times_diff = np.unique(np.diff(candles_times))
-    milliseconds_for_interval = get_seconds_for_an_interval("1m") * 1000
-    if len(candles_times_diff) > 1 or np.any(candles_times_diff != milliseconds_for_interval):
-        logging.warning(f"{symbol} inconsistent candles intervals: {candles_times_diff}")
+    if not check_if_candles_are_consistent(symbol, candles, "1m"):
         return None
-
+        
     # first, let's calculate perfect extrema to know how a perfect trading would look like
     mfi = calculate_mfi(candles, MFI_TIMEINTERVAL)
     troughs, peaks = find_extrema(mfi)

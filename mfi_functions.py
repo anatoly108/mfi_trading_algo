@@ -235,6 +235,16 @@ def calculate_num_candles(interval, startTime, endTime):
     num_candles = int(total_seconds // interval_seconds)
     return num_candles
 
+def check_if_candles_are_consistent(symbol, candles, interval):
+    candles_times = np.array([candle[0] for candle in candles])
+    candles_times_diff = np.unique(np.diff(candles_times))
+    milliseconds_for_interval = get_seconds_for_an_interval("1m") * 1000
+    if len(candles_times_diff) > 1 or np.any(candles_times_diff != milliseconds_for_interval):
+        logging.warning(f"{symbol} inconsistent candles intervals: {candles_times_diff}")
+        return False
+    else:
+        return True
+
 # note: this will return only complete candles!
 # startTime and endTime are datetime objects, easiest way to specify: datetime.strptime("2024-01-01 00:00:00", "%Y-%m-%d %H:%M:%S")
 def get_candles(symbol, interval, exchange_client, startTime=None, endTime=None, hours=LOOKBACK_PERIOD_H, now=None):
@@ -471,6 +481,14 @@ def run_mfi_trading_algo(symbol, dry_run, exchange_client,
             last_local_minima = mfi_i
 
     while True:
+        is_consistent = check_if_candles_are_consistent(symbol, candles, "1m")
+
+        if not is_consistent and not bought:
+            logging.warning("Not consistent, not bought. Breaking")
+            break
+        elif not is_consistent and bought:
+            logging.warning("Not consistent, waiting for sell signal.")
+        
         if quantity == 0:
             # can happen if asset is expensive and usdt_amount is small
             logging.warning(f"{symbol} Quantity equals 0. Breaking.")
