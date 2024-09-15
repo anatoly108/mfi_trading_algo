@@ -280,6 +280,13 @@ def analyze_pair(ticker_data, exchange_client, now=None, do_calculate_liquidity_
         # not enough candles: history doesn't go that far back
         return None
 
+    candles_times = np.array([candle[0] for candle in candles])
+    candles_times_diff = np.unique(np.diff(candles_times))
+    milliseconds_for_interval = get_seconds_for_an_interval("1m") * 1000
+    if len(candles_times_diff) > 1 or np.any(candles_times_diff != milliseconds_for_interval):
+        logging.warning(f"{symbol} inconsistent candles intervals: {candles_times_diff}")
+        return None
+
     # first, let's calculate perfect extrema to know how a perfect trading would look like
     mfi = calculate_mfi(candles, MFI_TIMEINTERVAL)
     troughs, peaks = find_extrema(mfi)
