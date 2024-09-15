@@ -74,7 +74,7 @@ def process_symbol(args, symbol, exchange_client, out_directory_name, bar_pos):
             timepoint_results["timepoint"] = convert_to_unix(timepoint)
 
             # all_timepoint_results will become a DataFrame, so we only keep simple values, no lists/arrays 
-            timepoint_results_sub = {key: value for key, value in timepoint_results.items() if isinstance(value, (str, int, float))}
+            timepoint_results_sub = {key: value for key, value in timepoint_results.items() if isinstance(value, (str, int, float, np.integer, np.floating))}
             all_timepoint_results.append(timepoint_results_sub)
 
             end_time = time.time()

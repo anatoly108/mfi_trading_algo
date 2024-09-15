@@ -464,7 +464,7 @@ def run_mfi_trading_algo(symbol, dry_run, exchange_client,
     while True:
         if quantity == 0:
             # can happen if asset is expensive and usdt_amount is small
-            logging.warning(f"Quantity equals 0. Breaking.")
+            logging.warning(f"{symbol} Quantity equals 0. Breaking.")
             # this if can also be outside of this loop (before it),
             # but it's more convenient to have it here because then we won't have to
             # repeat the part of the function after the loop 
