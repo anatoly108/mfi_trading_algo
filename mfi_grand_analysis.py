@@ -59,7 +59,7 @@ def process_symbol(args, symbol, exchange_client, out_directory_name, start_date
                                             now=timepoint,
                                             do_calculate_liquidity_score=False)
             logging.disable(logging.NOTSET)
-            if timepoint_results["code"] == AnalysisResultCode.FAIL_NO_CANLDES:
+            if timepoint_results["code"] == AnalysisResultCode.FAIL_NO_CANDLES:
                 # not enough candles to cover history that far back
                 # that's where it's important that timepoints are generated from most recent to oldest
                 break
