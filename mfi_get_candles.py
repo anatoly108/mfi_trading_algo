@@ -43,47 +43,20 @@ def generate_timepoints(start_date, end_date, hours):
 def process_symbol(args, symbol, exchange_client, out_directory_name, start_date, end_date):
     setup_logging(log_dir = out_directory_name, file_suffix=f"{symbol}_", log_to_stdout=True)
     logging.info(f"Starting {symbol}")
+    start_time = time.time()
 
     try:
-        # important: timepoints are generated from most recent to oldest
-        timepoints = generate_timepoints(start_date, end_date, MFI_TRADING_TIMEOUT_H)
-        all_timepoint_results = []
-        iteration_times = []
+        candles = get_candles(symbol=symbol,
+                            interval="1m",
+                            exchange_client=exchange_client,
+                            startTime=start_date,
+                            endTime=end_date)
 
-        for i, timepoint in enumerate(timepoints):
-            start_time = time.time()
-
-            logging.disable(logging.INFO) # to avoid logging a lot of infos
-            timepoint_results = analyze_pair(ticker_data={"symbol": symbol},
-                                            exchange_client=exchange_client,
-                                            now=timepoint,
-                                            do_calculate_liquidity_score=False)
-            logging.disable(logging.NOTSET)
-            if timepoint_results is None:
-                # not enough candles to cover history that far back
-                # that's where it's important that timepoints are generated from most recent to oldest
-                break
-
-            # timepoint_results is the "input" data that we use to trade next MFI_TRADING_TIMEOUT_H hours
-            # now, we need "output" data which is the trading results of the next MFI_TRADING_TIMEOUT_H hours
-            # we'll sumply get it with next timepoint_results because it will be MFI_TRADING_TIMEOUT_H shifted
-            # therefore it becomes a loop: every result is "output" of previous and "input" for next
-            timepoint_results["timepoint"] = convert_to_unix(timepoint)
-
-            # all_timepoint_results will become a DataFrame, so we only keep simple values, no lists/arrays 
-            timepoint_results_sub = {key: value for key, value in timepoint_results.items() if isinstance(value, (str, int, float, np.integer, np.floating))}
-            all_timepoint_results.append(timepoint_results_sub)
-
-            end_time = time.time()
-            iteration_time = end_time - start_time
-            iteration_times.append(iteration_time)
-            if (i + 1) % 10 == 0:
-                average_time = sum(iteration_times) / len(iteration_times)
-                logging.info(f"{symbol} time per iteration: {average_time:.4f} seconds, {i+1}/{len(timepoints)}")
-
-        df = pd.DataFrame(all_timepoint_results)
+        df = pd.DataFrame(candles)
+        df.columns = ["time", "open", "high", "low", "close", "volume"]
         df.to_csv(f"{out_directory_name}/{symbol}.csv", index=False)
-        total_time = sum(iteration_times) / 60
+        end_time = time.time()
+        total_time = (end_time - start_time) / 60
         logging.info(f"Finished {symbol}, time elapsed: {total_time:.2f} minutes")
 
     except Exception as e:
@@ -94,9 +67,8 @@ def process_symbol(args, symbol, exchange_client, out_directory_name, start_date
 if __name__ == "__main__":
     parser = argparse.ArgumentParser(description="")
     parser.add_argument("--symbols", default=None, type=str)
-    parser.add_argument("--symbols_file", default=None, type=str)
     parser.add_argument("--months_back", default=6, type=int)
-    parser.add_argument("--threads", default=os.cpu_count(), type=int)
+    parser.add_argument("--threads", default=1, type=int)
     parser.add_argument("--exchange", required=False, default="binance")
     
     args = parser.parse_args()
@@ -104,7 +76,7 @@ if __name__ == "__main__":
     exchange_client = get_exchange_client(args.exchange)
 
     filename_suffix = datetime.now().strftime('%Y_%m_%d_%H_%M_%S')
-    out_directory_name = f"out/{datetime.now().strftime('%Y_%m_%d')}/grand_analysis/{filename_suffix}_{exchange_client.__class__.__name__}"
+    out_directory_name = f"out/{datetime.now().strftime('%Y_%m_%d')}/get_candles/{filename_suffix}_{exchange_client.__class__.__name__}"
     
     # Create the directory if it doesn't exist
     if not os.path.exists(out_directory_name):
@@ -120,15 +92,9 @@ if __name__ == "__main__":
         # take symbols given by user in the command line
         symbols = args.symbols.split(",")
 
-    if symbols is None and args.symbols_file is None:
+    if symbols is None:
         # take all symbols from exchange
         symbols = exchange_client.get_all_spot_usdt_pairs()
-
-    if args.symbols_file is not None:
-        # take symbols from a file
-        with open(args.symbols_file, 'r') as file:
-            symbols = [line.strip() for line in file]
-        symbols = [symbol for symbol in symbols if symbol != ""]
 
     # write to file which symbols it's operating on
     with open(f"{out_directory_name}/symbols.txt", 'w') as file:
@@ -139,7 +105,7 @@ if __name__ == "__main__":
     start_date = end_date - timedelta(hours=args.months_back * 30 * 24) # simplistic: assume month has 30 days 
 
     with Manager() as manager:
-        semaphore = manager.BoundedSemaphore(4) # allow only that many processes at a time to make a request
+        semaphore = manager.BoundedSemaphore(1) # allow only that many processes at a time to make a request
         exchange_client.semaphore = semaphore
 
         with concurrent.futures.ProcessPoolExecutor(max_workers=args.threads) as executor:
