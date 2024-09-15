@@ -17,6 +17,12 @@ from mfi_functions import setup_logging, calculate_mfi, \
                             run_mfi_trading_algo, usd_to_quantity, VOL_THRESHOLD, \
                             calculate_liquidity_score, get_exchange_client, write_trading_results, \
                             MFI_TRADING_TIMEOUT_H, LOOKBACK_PERIOD_H, check_if_candles_are_consistent
+from enum import Enum
+
+class AnalysisResultCode(Enum):
+    SUCCESS = 1
+    FAIL_NO_CANDLES = 2
+    FAIL_ERROR = 3
 
 def convert_to_millions(volume):
     # Convert the volume to millions
@@ -274,15 +280,15 @@ def analyze_pair(ticker_data, exchange_client, now=None, do_calculate_liquidity_
                           now=now)
     if len(candles) == 0:
         # no candles for the period
-        return None
+        return {"code": AnalysisResultCode.FAIL_NO_CANDLES}
     
     if len(candles) < (LOOKBACK_PERIOD_H+MFI_TRADING_TIMEOUT_H) * 60:
         # not enough candles: history doesn't go that far back
-        return None
+        return {"code": AnalysisResultCode.FAIL_NO_CANDLES}
 
     if not check_if_candles_are_consistent(symbol, candles, "1m"):
-        return None
-        
+        return {"code": AnalysisResultCode.FAIL_ERROR}
+
     # first, let's calculate perfect extrema to know how a perfect trading would look like
     mfi = calculate_mfi(candles, MFI_TIMEINTERVAL)
     troughs, peaks = find_extrema(mfi)
@@ -333,6 +339,7 @@ def analyze_pair(ticker_data, exchange_client, now=None, do_calculate_liquidity_
     average_holding_time, time_in_market = calculate_average_holding_time_and_time_in_market(buy_signals, sell_signals, candles=candles_part2)
 
     result_dict = {
+        "code": AnalysisResultCode.SUCCESS,
         "symbol": symbol,
         "candles": candles,
         "mfi": mfi,
@@ -443,6 +450,7 @@ def mfi_analysis_main(exchange_client, plot_all=False, short=False, symbols=None
                                                 now=now))
             
             results = [future.result() for future in tqdm(concurrent.futures.as_completed(futures), total=len(futures)) if future.result()]
+            results = [result for result in results if result["code"] == AnalysisResultCode.SUCCESS]
     
     exchange_client.semaphore = None # remove semaphore: otherwise it will hang indefinitely when manager is closed
     

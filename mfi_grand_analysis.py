@@ -17,7 +17,7 @@ from mfi_functions import setup_logging, calculate_mfi, \
                             run_mfi_trading_algo, usd_to_quantity, VOL_THRESHOLD, \
                             calculate_liquidity_score, get_exchange_client, write_trading_results, \
                             MFI_TRADING_TIMEOUT_H, LOOKBACK_PERIOD_H, convert_to_unix, get_last_complete_time_for_candles
-from mfi_analysis import analyze_pair
+from mfi_analysis import analyze_pair, AnalysisResultCode
 
 def generate_timepoints(start_date, end_date, hours):
     """
@@ -59,10 +59,14 @@ def process_symbol(args, symbol, exchange_client, out_directory_name, start_date
                                             now=timepoint,
                                             do_calculate_liquidity_score=False)
             logging.disable(logging.NOTSET)
-            if timepoint_results is None:
+            if timepoint_results["code"] == AnalysisResultCode.FAIL_NO_CANLDES:
                 # not enough candles to cover history that far back
                 # that's where it's important that timepoints are generated from most recent to oldest
                 break
+
+            if timepoint_results["code"] == AnalysisResultCode.FAIL_ERROR:
+                # try to continue on other errors
+                continue
 
             # timepoint_results is the "input" data that we use to trade next MFI_TRADING_TIMEOUT_H hours
             # now, we need "output" data which is the trading results of the next MFI_TRADING_TIMEOUT_H hours
