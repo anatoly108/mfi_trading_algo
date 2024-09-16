@@ -580,13 +580,13 @@ def run_mfi_trading_algo(symbol, dry_run, exchange_client,
                 candles_since_buy += 1 # bought, but not sold; we'll lower the MFI threshold every candle
 
         if do_plot:
-            plot_asset({
-                "symbol": symbol,
-                "candles": candles,
-                "mfi": mfi,
-                "buy_signals": buy_signals,
-                "sell_signals": sell_signals
-            }, f"_trading_{start_time_str}_{exchange_client.__class__.__name__}", out_dir=out_dir)
+            plot_asset(symbol=symbol,
+                        candles=candles,
+                        mfi=mfi,
+                        buy_signals=buy_signals,
+                        sell_signals=sell_signals, 
+                        plot_suffix=f"_trading_{start_time_str}_{exchange_client.__class__.__name__}", 
+                        out_dir=out_dir)
 
         logging.info(f"Waiting for the next candle, current candles above threshold: {candles_above_threshold}")
         
