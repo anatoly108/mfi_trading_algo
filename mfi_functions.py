@@ -433,7 +433,7 @@ def write_trading_results(results, global_results_csv, global_trades_csv, additi
 def run_mfi_trading_algo(symbol, dry_run, exchange_client,
                          negative_cancel_num=3, get_new_candles_function=get_new_candles_from_exchange,
                          candles=None, exit_after_no_candle=False, do_plot=True, out_dir="out",
-                         quantity=None, usdt_amount=None):
+                         quantity=None, usdt_amount=None, stop_loss_pct=2.0):
     if quantity is None and usdt_amount is None:
         raise Exception("quantity is None and usdt_amount is None")
 
@@ -465,6 +465,12 @@ def run_mfi_trading_algo(symbol, dry_run, exchange_client,
     candles_since_buy = 0
     iteration = 0
     candles_above_threshold = 0  # Initialize candles_above_threshold
+
+    # Initialize buy_price for stop-loss calculation
+    buy_price = None
+
+    # Convert stop_loss_pct to decimal
+    stop_loss_threshold = stop_loss_pct / 100.0
 
     while True:
         is_consistent = check_if_candles_are_consistent(symbol, candles, "1m")
@@ -504,14 +510,15 @@ def run_mfi_trading_algo(symbol, dry_run, exchange_client,
         for i in range(mfi_new_from, mfi_new_to):
             mfi_i = mfi[i]
             mfi_prev = mfi[i - 1]
-            logging.info(f"Current MFI value: {mfi_i}")
+            current_close_price = float(candles[i][4])
+            logging.info(f"Current MFI value: {mfi_i}, Close Price: {current_close_price}")
 
             if not bought and mfi_prev < MFI_THRESHOLD_LOW and mfi_i >= MFI_THRESHOLD_LOW:
                 bought = True
                 # buy signal
                 order = exchange_client.execute_market_order(symbol=symbol, side="buy", quantity=quantity, dry_run=dry_run)
                 if order["price"] is None:
-                    buy_price = candles[i][4] # take last close price for dry run
+                    buy_price = current_close_price  # take last close price for dry run
                 else:
                     buy_price = float(order["price"])
                 buy_signals.append(i)
@@ -521,6 +528,9 @@ def run_mfi_trading_algo(symbol, dry_run, exchange_client,
             if not bought:
                 logging.info(f"Not bought")
                 continue
+            
+            # Check for Stop-Loss
+            stop_loss = current_close_price <= buy_price * (1 - stop_loss_threshold)
 
             # maxima
             current_mfi_threshold_high = MFI_THRESHOLD_HIGH - candles_since_buy * MFI_THRESHOLD_DECREASE_PER_CANDLE
@@ -535,7 +545,7 @@ def run_mfi_trading_algo(symbol, dry_run, exchange_client,
             else:
                 candles_above_threshold = 0
 
-            if candles_above_threshold >= 2:
+            if candles_above_threshold >= 2 or stop_loss:
                 # sell as soon as MFI stays above threshold for 2 candles
                 candles_above_threshold = 0
                 candles_since_buy = 0
@@ -544,12 +554,15 @@ def run_mfi_trading_algo(symbol, dry_run, exchange_client,
                 order = exchange_client.execute_market_order(symbol=symbol, side="sell", quantity=quantity, dry_run=dry_run)
 
                 if order["price"] is None:
-                    sell_price = candles[i][4] # take last close price for dry run
+                    sell_price = current_close_price
                 else:
                     sell_price = float(order["price"])
 
                 sell_signals.append(i)
-                logging.info(f"Sell signal: price {sell_price}, MFI {mfi_i}")
+                if stop_loss:
+                    logging.info(f"Stop-Loss Triggered: price {sell_price}, MFI {mfi_i}")
+                else:
+                    logging.info(f"Sell signal: price {sell_price}, MFI {mfi_i}")
 
                 sell_final = sell_price * quantity
                 buy_final = buy_price * quantity
