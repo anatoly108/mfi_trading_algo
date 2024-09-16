@@ -432,8 +432,8 @@ def write_trading_results(results, global_results_csv, global_trades_csv, additi
 
 def run_mfi_trading_algo(symbol, dry_run, exchange_client,
                          negative_cancel_num=3, get_new_candles_function=get_new_candles_from_exchange,
-                         candles = None, exit_after_no_candle=False, do_plot=True, out_dir="out", 
-                         quantity=None, usdt_amount=None): 
+                         candles=None, exit_after_no_candle=False, do_plot=True, out_dir="out",
+                         quantity=None, usdt_amount=None):
     if quantity is None and usdt_amount is None:
         raise Exception("quantity is None and usdt_amount is None")
 
@@ -455,8 +455,6 @@ def run_mfi_trading_algo(symbol, dry_run, exchange_client,
 
     mfi = calculate_mfi(candles, MFI_TIMEINTERVAL)
 
-    last_local_minima = 100
-    candles_above_threshold = 0
     bought = False
     really_new_candles = []
     total_profit = 0
@@ -466,19 +464,7 @@ def run_mfi_trading_algo(symbol, dry_run, exchange_client,
     profits = []
     candles_since_buy = 0
     iteration = 0
-
-    # initialize last_local_minima - for the case when there's a buy opportunity immediately at start
-    for i in range(1, len(mfi)):
-        mfi_i = mfi[i]
-        
-        # minima
-        if mfi_i > MFI_THRESHOLD_LOW:
-            # if last candle is above threshold, last_local_minima is reset
-            last_local_minima = 100
-
-        if mfi_i < MFI_THRESHOLD_LOW and mfi_i < last_local_minima:
-            # if last candle is below threshold, last_local_minima is set accordingly
-            last_local_minima = mfi_i
+    candles_above_threshold = 0  # Initialize candles_above_threshold
 
     while True:
         is_consistent = check_if_candles_are_consistent(symbol, candles, "1m")
@@ -495,6 +481,7 @@ def run_mfi_trading_algo(symbol, dry_run, exchange_client,
             # this if can also be outside of this loop (before it),
             # but it's more convenient to have it here because then we won't have to
             # repeat the part of the function after the loop 
+
             break
             
         if termination_flag.value:
@@ -516,22 +503,10 @@ def run_mfi_trading_algo(symbol, dry_run, exchange_client,
         # if len(really_new_candles) == 0, then this for loop won't even start
         for i in range(mfi_new_from, mfi_new_to):
             mfi_i = mfi[i]
+            mfi_prev = mfi[i - 1]
             logging.info(f"Current MFI value: {mfi_i}")
-            logging.info(f"Current local minima: {last_local_minima}")
-        
-            # minima
-            if mfi_i < MFI_THRESHOLD_LOW and mfi_i < last_local_minima:
-                last_local_minima = mfi_i
-                logging.info(f"New local minima: {last_local_minima}")
-            
-            diff_to_minima = mfi_i - last_local_minima
-            
-            if mfi_i > MFI_THRESHOLD_LOW_EXTENDED:
-                # reset local minima only when mfi goes higher than extended threshold
-                last_local_minima = 100
-            
-            if mfi_i < MFI_THRESHOLD_LOW_EXTENDED and diff_to_minima > MFI_STEP_THRESHOLD and not bought:
-                last_local_minima = 100
+
+            if not bought and mfi_prev < MFI_THRESHOLD_LOW and mfi_i >= MFI_THRESHOLD_LOW:
                 bought = True
                 # buy signal
                 order = exchange_client.execute_market_order(symbol=symbol, side="buy", quantity=quantity, dry_run=dry_run)
