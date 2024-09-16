@@ -14,7 +14,7 @@ import signal
 import sys
 from multiprocessing import current_process, Manager
 from mfi_functions import setup_logging, calculate_mfi, \
-                            find_extrema, plot_asset, get_candles, MFI_TIMEINTERVAL, \
+                            find_extrema, get_candles, MFI_TIMEINTERVAL, \
                             run_mfi_trading_algo, usd_to_quantity, termination_flag, get_exchange_client, \
                             write_trading_results, VOL_THRESHOLD
 from mfi_analysis import mfi_analysis_main
@@ -92,7 +92,8 @@ if __name__ == "__main__":
                                       (analysis_df.liquidity_score > args.liq_min) &
                                       (analysis_df.liquidity_score < args.liq_max) &
                                       (analysis_df.volatility_score != 1) &  # volatility_score = 1 are too crazy weird coins
-                                      (analysis_df.empty_candles_fraction <= args.empty_candles_fraction)]
+                                      (analysis_df.empty_candles_fraction <= args.empty_candles_fraction) &
+                                      (analysis_df.ema100_latest_normalized > analysis_df.ema200_latest_normalized)] # EMA uptrend
 
         analysis_df_sub = analysis_df_sub.sort_values(by='total_profit', ascending=False)
         chosen_assets = list(analysis_df_sub["symbol"])[:min(analysis_df_sub.shape[0], args.n_assets_to_trade)]

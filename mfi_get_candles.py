@@ -13,7 +13,7 @@ import time
 from multiprocessing import BoundedSemaphore, Manager
 import concurrent.futures
 from mfi_functions import setup_logging, calculate_mfi, \
-                            find_extrema, plot_asset, get_candles, MFI_TIMEINTERVAL, \
+                            find_extrema, get_candles, MFI_TIMEINTERVAL, \
                             run_mfi_trading_algo, usd_to_quantity, VOL_THRESHOLD, \
                             calculate_liquidity_score, get_exchange_client, write_trading_results, \
                             MFI_TRADING_TIMEOUT_H, LOOKBACK_PERIOD_H, convert_to_unix, get_last_complete_time_for_candles

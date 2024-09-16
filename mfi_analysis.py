@@ -337,17 +337,12 @@ def analyze_pair(ticker_data, exchange_client, now=None, do_calculate_liquidity_
     empty_candles_fraction = (empty_candles_number / len(candles_past_24h)) if len(candles_past_24h) > 0 else 0
     macd_line, signal_line, macd_histogram = calculate_macd(candles)
     average_holding_time, time_in_market = calculate_average_holding_time_and_time_in_market(buy_signals, sell_signals, candles=candles_part2)
+    result_dict = trading_results
 
-    result_dict = {
+    result_dict.update({
         "code": AnalysisResultCode.SUCCESS,
-        "symbol": symbol,
-        "candles": candles,
-        "mfi": mfi,
-        "buy_signals": buy_signals,
-        "sell_signals": sell_signals,
-        "profits": trading_results["profits"],
-        "total_profit": round(trading_results["total_profit"], 1),
-        "total_profit_minus_fees": round(total_profit_minus_fees, 1),
+        "mfi_full": mfi,
+        "candles_full": candles,
         "pnl": round((trading_results["total_profit"]/usdt)*100, 1),
         "fees": fees,
         "orders_num": orders_num,
@@ -386,7 +381,7 @@ def analyze_pair(ticker_data, exchange_client, now=None, do_calculate_liquidity_
         "ema200_latest": ema200_latest,
         "ema200_start_normalized": ema200_start_normalized,
         "ema200_latest_normalized": ema200_latest_normalized
-    }
+    })
 
     if do_calculate_liquidity_score:
         try:
@@ -485,16 +480,34 @@ def mfi_analysis_main(exchange_client, plot_all=False, short=False, symbols=None
     if plot_all:
         logging.info("Making all plots")
         for asset in tqdm(results):
-            plot_asset(asset, "_analysis", out_dir=out_directory_name)
+            plot_asset(symbol=asset["symbol"], 
+                        candles=asset["candles_full"], 
+                        mfi=asset["mfi_full"], 
+                        buy_signals=asset["buy_signals"], 
+                        sell_signals=asset["sell_signals"], 
+                        plot_suffix="_analysis", 
+                        out_dir=out_directory_name)
     else:
         logging.info("Making top/flop plots")
         # Plotting each of the top 10 assets
         for asset in results_top:
-            plot_asset(asset, "_analysis_top", out_dir=out_directory_name)
+            plot_asset(symbol=asset["symbol"], 
+                        candles=asset["candles_full"], 
+                        mfi=asset["mfi_full"], 
+                        buy_signals=asset["buy_signals"], 
+                        sell_signals=asset["sell_signals"], 
+                        plot_suffix="_analysis_top", 
+                        out_dir=out_directory_name)
 
         # Plotting each of the flop 10 assets
         for asset in results_flop:
-            plot_asset(asset, "_analysis_flop", out_dir=out_directory_name)
+            plot_asset(symbol=asset["symbol"], 
+                        candles=asset["candles_full"], 
+                        mfi=asset["mfi_full"], 
+                        buy_signals=asset["buy_signals"], 
+                        sell_signals=asset["sell_signals"], 
+                        plot_suffix="_analysis_flop", 
+                        out_dir=out_directory_name)
 
     return results, df
 

@@ -308,13 +308,7 @@ def find_extrema(data):
     return troughs, peaks
 
 
-def plot_asset(asset_data, plot_suffix="", out_dir="out"):
-    symbol = asset_data["symbol"]
-    candles = asset_data["candles"]
-    mfi = asset_data["mfi"]
-    buy_signals = asset_data["buy_signals"]
-    sell_signals = asset_data["sell_signals"]
-
+def plot_asset(symbol, candles, mfi, buy_signals, sell_signals, plot_suffix="", out_dir="out"):
     # Convert candles to a DataFrame
     df = pd.DataFrame(candles, columns=["timestamp", "open", "high", "low", "close", "volume"])
     df["timestamp"] = pd.to_datetime(df["timestamp"], unit='ms')
@@ -414,11 +408,14 @@ def write_trading_results(results, global_results_csv, global_trades_csv, additi
                 "sell_signal": sell_signal,
                 "mfi_i_buy": mfi_i_buy,
                 "mfi_i_sell": mfi_i_sell,
+                "buy_price": result["buy_prices"][i],
+                "sell_price": result["sell_prices"][i],
                 "profit": profit,
                 "candle_buy_time": candle_buy_time,
                 "candle_buy_close": candle_buy_close,
                 "candle_sell_time": candle_sell_time,
-                "candle_sell_close": candle_sell_close
+                "candle_sell_close": candle_sell_close,
+                "is_stop_loss": sell_signal in result["stop_loss_signals"]
             }
             trade_dict.update(additional_values_to_add)
             trades.append(trade_dict)
@@ -431,9 +428,9 @@ def write_trading_results(results, global_results_csv, global_trades_csv, additi
     trades_df.to_csv(global_trades_csv, mode="a", header=header, index=False)
 
 def run_mfi_trading_algo(symbol, dry_run, exchange_client,
-                         negative_cancel_num=3, get_new_candles_function=get_new_candles_from_exchange,
+                         negative_cancel_num=2, get_new_candles_function=get_new_candles_from_exchange,
                          candles=None, exit_after_no_candle=False, do_plot=True, out_dir="out",
-                         quantity=None, usdt_amount=None, stop_loss_pct=2.0):
+                         quantity=None, usdt_amount=None, stop_loss_pct=1.0):
     if quantity is None and usdt_amount is None:
         raise Exception("quantity is None and usdt_amount is None")
 
@@ -461,6 +458,10 @@ def run_mfi_trading_algo(symbol, dry_run, exchange_client,
     total_profit_minus_fees = 0
     buy_signals = []
     sell_signals = []
+    stop_loss_signals = []
+    neg_profit_interrupted = False
+    buy_prices = []
+    sell_prices = []
     profits = []
     candles_since_buy = 0
     iteration = 0
@@ -522,6 +523,7 @@ def run_mfi_trading_algo(symbol, dry_run, exchange_client,
                 else:
                     buy_price = float(order["price"])
                 buy_signals.append(i)
+                buy_prices.append(buy_price)
                 logging.info(f"Buy signal: price {buy_price}, MFI {mfi_i}")
                 break # this will break only from the mfi for loop - we can't sell inside this for loop because we would sell for the same price
 
@@ -559,8 +561,10 @@ def run_mfi_trading_algo(symbol, dry_run, exchange_client,
                     sell_price = float(order["price"])
 
                 sell_signals.append(i)
+                sell_prices.append(sell_price)
                 if stop_loss:
                     logging.info(f"Stop-Loss Triggered: price {sell_price}, MFI {mfi_i}")
+                    stop_loss_signals.append(i)
                 else:
                     logging.info(f"Sell signal: price {sell_price}, MFI {mfi_i}")
 
@@ -598,6 +602,10 @@ def run_mfi_trading_algo(symbol, dry_run, exchange_client,
         logging.info(f"Got {len(really_new_candles)} new candle(s)")
         if len(really_new_candles) == 0 and exit_after_no_candle:
             logging.info(f"No new candles and exit_after_no_candle is True. Exiting.")
+            if bought:
+                logging.info(f"Removing last buy.")
+                buy_signals.pop()
+                buy_prices.pop()
             break
 
         if len(really_new_candles) == 0:
@@ -612,6 +620,7 @@ def run_mfi_trading_algo(symbol, dry_run, exchange_client,
         # Check last N profits
         if len(profits) >= negative_cancel_num and all(p < 0 for p in profits[-negative_cancel_num:]):
             logging.info(f"Negative profit in last {negative_cancel_num} iterations. Exiting.")
+            neg_profit_interrupted = True
             break
 
         # Check elapsed time - but finished only after trade was closed
@@ -629,9 +638,14 @@ def run_mfi_trading_algo(symbol, dry_run, exchange_client,
             "mfi": mfi,
             "buy_signals": buy_signals,
             "sell_signals": sell_signals,
+            "buy_prices": buy_signals,
+            "sell_prices": sell_signals,
             "total_profit": total_profit,
             "total_profit_minus_fees": total_profit_minus_fees,
-            "profits": profits
+            "profits": profits,
+            "stop_loss_signals": stop_loss_signals,
+            "stop_loss_n": len(stop_loss_signals),
+            "neg_profit_interrupted": neg_profit_interrupted
         }
 
     return(res_dict)

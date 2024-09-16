@@ -13,7 +13,7 @@ import time
 from multiprocessing import BoundedSemaphore, Manager
 import concurrent.futures
 from mfi_functions import setup_logging, calculate_mfi, \
-                            find_extrema, plot_asset, get_candles, MFI_TIMEINTERVAL, \
+                            find_extrema, get_candles, MFI_TIMEINTERVAL, \
                             run_mfi_trading_algo, usd_to_quantity, VOL_THRESHOLD, \
                             calculate_liquidity_score, get_exchange_client, write_trading_results, \
                             MFI_TRADING_TIMEOUT_H, LOOKBACK_PERIOD_H, convert_to_unix, get_last_complete_time_for_candles
@@ -48,6 +48,7 @@ def process_symbol(args, symbol, exchange_client, out_directory_name, start_date
         # important: timepoints are generated from most recent to oldest
         timepoints = generate_timepoints(start_date, end_date, MFI_TRADING_TIMEOUT_H)
         all_timepoint_results = []
+        all_timepoint_results_full = []
         iteration_times = []
 
         for i, timepoint in enumerate(timepoints):
@@ -73,6 +74,7 @@ def process_symbol(args, symbol, exchange_client, out_directory_name, start_date
             # we'll sumply get it with next timepoint_results because it will be MFI_TRADING_TIMEOUT_H shifted
             # therefore it becomes a loop: every result is "output" of previous and "input" for next
             timepoint_results["timepoint"] = convert_to_unix(timepoint)
+            all_timepoint_results_full.append(timepoint_results)
 
             # all_timepoint_results will become a DataFrame, so we only keep simple values, no lists/arrays 
             timepoint_results_sub = {key: value for key, value in timepoint_results.items() if isinstance(value, (str, int, float, np.integer, np.floating))}
@@ -87,6 +89,12 @@ def process_symbol(args, symbol, exchange_client, out_directory_name, start_date
 
         df = pd.DataFrame(all_timepoint_results)
         df.to_csv(f"{out_directory_name}/{symbol}.csv", index=False)
+
+        write_trading_results(results=all_timepoint_results_full,
+                    global_results_csv=f"{out_directory_name}/{symbol}_{exchange_client.__class__.__name__}_results.csv",
+                    global_trades_csv=f"{out_directory_name}/{symbol}_{exchange_client.__class__.__name__}_trades.csv",
+                    additional_values_to_add={"exchange": exchange_client.__class__.__name__})
+
         total_time = sum(iteration_times) / 60
         logging.info(f"Finished {symbol}, time elapsed: {total_time:.2f} minutes")
 
