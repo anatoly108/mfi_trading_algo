@@ -17,6 +17,7 @@ from exchanges import Binance, Mexc
 import multiprocessing
 import signal
 from multiprocessing import current_process, Manager
+from functions import get_seconds_for_an_interval, check_if_candles_are_consistent
 
 MFI_THRESHOLD_LOW = 20
 MFI_THRESHOLD_LOW_EXTENDED = MFI_THRESHOLD_LOW + 10
@@ -172,26 +173,6 @@ def get_last_complete_time_for_candles(interval):
     
     return last_complete_time
 
-def get_seconds_for_an_interval(interval):
-    if interval.endswith('m'):  # Minute intervals
-        interval_seconds = int(interval.replace("m", "")) * 60
-    elif interval.endswith('h'):  # Hour intervals
-        interval_seconds = int(interval.replace("h", "")) * 3600
-    elif interval == '1d':  # 1 day interval
-        interval_seconds = 86400
-    elif interval == '3d':  # 3 days interval
-        interval_seconds = 86400 * 3
-    elif interval == '1w':  # 1 week interval
-        interval_seconds = 86400 * 7
-    elif interval == '1M':  # 1 month interval
-        # This is more complex since months vary in length, but you can use an average or approximate value.
-        # Here's an average month length in seconds:
-        interval_seconds = 86400 * 30.44
-    else:
-        raise ValueError("Unsupported interval")
-
-    return interval_seconds
-
 def calculate_num_candles(interval, startTime, endTime):
     interval_seconds = get_seconds_for_an_interval(interval)
 
@@ -199,15 +180,6 @@ def calculate_num_candles(interval, startTime, endTime):
     num_candles = int(total_seconds // interval_seconds)
     return num_candles
 
-def check_if_candles_are_consistent(symbol, candles, interval):
-    candles_times = np.array([candle[0] for candle in candles])
-    candles_times_diff = np.unique(np.diff(candles_times))
-    milliseconds_for_interval = get_seconds_for_an_interval("1m") * 1000
-    if len(candles_times_diff) > 1 or np.any(candles_times_diff != milliseconds_for_interval):
-        logging.warning(f"{symbol} inconsistent candles intervals: {candles_times_diff}")
-        return False
-    else:
-        return True
 
 # note: this will return only complete candles!
 # startTime and endTime are datetime objects, easiest way to specify: datetime.strptime("2024-01-01 00:00:00", "%Y-%m-%d %H:%M:%S")

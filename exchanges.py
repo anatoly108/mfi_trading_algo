@@ -114,6 +114,14 @@ class Exchange(metaclass=RetryMeta):
     def get_order_book(self, symbol, limit=100):
         pass
 
+    @abstractmethod
+    def get_all_perp_usdt_pairs(self):
+        pass
+
+    @abstractmethod
+    def get_open_interest(self, symbol, interval, startTime=None, endTime=None):
+        pass
+
 class Binance(Exchange):
     def __init__(self, config_path="", semaphore=None):
         super().__init__(config_path, semaphore)
@@ -175,6 +183,45 @@ class Binance(Exchange):
     @semaphore_decorator()
     def get_order_book(self, symbol, limit=100):
         return BinanceClient().get_order_book(symbol=symbol, limit=limit)
+
+    @semaphore_decorator()
+    def get_all_perp_usdt_pairs(self):
+        # Fetch all futures symbols
+        futures_info = BinanceClient().futures_exchange_info()
+        
+        # Filter for PERPETUAL contract types
+        perpetual_symbols = [symbol['symbol'] for symbol in futures_info['symbols'] if symbol['contractType'] == 'PERPETUAL' and 'USD' in symbol['quoteAsset']]
+        
+        return perpetual_symbols
+
+    @semaphore_decorator()
+    def get_open_interest(self, symbol, interval, startTime=None, endTime=None):
+        oi_data = []
+
+        startTimeMillis = None
+        endTimeMillis = None
+
+        if startTime is not None and endTime is not None:
+            # Convert datetime to milliseconds for Binance API
+            startTimeMillis = int(startTime.timestamp() * 1000)
+            endTimeMillis = int(endTime.timestamp() * 1000)
+
+        # Fetch OI historical data
+        # https://developers.binance.com/docs/derivatives/usds-margined-futures/market-data/rest-api/Open-Interest-Statistics
+        oi_response = BinanceClient().futures_open_interest_hist(
+            symbol=symbol,
+            period=interval,
+            limit=500,
+            startTime=startTimeMillis,
+            endTime=endTimeMillis
+        )
+
+        # Extract Open Interest values from the response
+        for data_point in oi_response:
+            # in BTCUSD sumOpenInterest is USD
+            oi_data.append(float(data_point['sumOpenInterest']))
+
+        return oi_data
 
 class Mexc(Exchange):
     def __init__(self, config_path="", semaphore=None):

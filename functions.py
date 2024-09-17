@@ -1,5 +1,8 @@
 import logging
 import os
+from datetime import datetime
+import sys
+import numpy as np
 
 def setup_logging(log_dir=None, file_suffix="", log_to_stdout=True):
     if log_dir is None:
@@ -36,3 +39,35 @@ def setup_logging(log_dir=None, file_suffix="", log_to_stdout=True):
 
     # Set the custom exception hook as the global one
     sys.excepthook = log_exception
+
+
+def get_seconds_for_an_interval(interval):
+    if interval.endswith('m'):  # Minute intervals
+        interval_seconds = int(interval.replace("m", "")) * 60
+    elif interval.endswith('h'):  # Hour intervals
+        interval_seconds = int(interval.replace("h", "")) * 3600
+    elif interval == '1d':  # 1 day interval
+        interval_seconds = 86400
+    elif interval == '3d':  # 3 days interval
+        interval_seconds = 86400 * 3
+    elif interval == '1w':  # 1 week interval
+        interval_seconds = 86400 * 7
+    elif interval == '1M':  # 1 month interval
+        # This is more complex since months vary in length, but you can use an average or approximate value.
+        # Here's an average month length in seconds:
+        interval_seconds = 86400 * 30.44
+    else:
+        raise ValueError("Unsupported interval")
+
+    return interval_seconds
+
+
+def check_if_candles_are_consistent(symbol, candles, interval):
+    candles_times = np.array([candle[0] for candle in candles])
+    candles_times_diff = np.unique(np.diff(candles_times))
+    milliseconds_for_interval = get_seconds_for_an_interval(interval) * 1000
+    if len(candles_times_diff) > 1 or np.any(candles_times_diff != milliseconds_for_interval):
+        logging.warning(f"{symbol} inconsistent candles intervals: {candles_times_diff}")
+        return False
+    else:
+        return True
