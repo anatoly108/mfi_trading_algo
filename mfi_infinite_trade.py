@@ -13,10 +13,11 @@ import concurrent.futures
 import signal
 import sys
 from multiprocessing import current_process, Manager
-from mfi_functions import setup_logging, calculate_mfi, \
+from mfi_functions import calculate_mfi, \
                             find_extrema, get_candles, MFI_TIMEINTERVAL, \
                             run_mfi_trading_algo, usd_to_quantity, termination_flag, get_exchange_client, \
                             write_trading_results, VOL_THRESHOLD
+from functions import setup_logging
 from mfi_analysis import mfi_analysis_main
 
 def run_mfi_trading_algo_wrapper(**kwargs):

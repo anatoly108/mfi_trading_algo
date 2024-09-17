@@ -8,7 +8,8 @@ import talib as ta
 import numpy as np
 import requests
 import sys
-from mfi_functions import setup_logging, run_mfi_trading_algo, usd_to_quantity, get_exchange_client
+from mfi_functions import run_mfi_trading_algo, usd_to_quantity, get_exchange_client
+from functions import setup_logging
 
 if __name__ == "__main__":
     parser = argparse.ArgumentParser(description="")

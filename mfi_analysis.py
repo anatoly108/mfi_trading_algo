@@ -12,11 +12,12 @@ import sys
 from scipy import stats
 from multiprocessing import BoundedSemaphore, Manager
 import concurrent.futures
-from mfi_functions import setup_logging, calculate_mfi, \
+from mfi_functions import calculate_mfi, \
                             find_extrema, plot_asset, get_candles, MFI_TIMEINTERVAL, \
                             run_mfi_trading_algo, usd_to_quantity, VOL_THRESHOLD, \
                             calculate_liquidity_score, get_exchange_client, write_trading_results, \
                             MFI_TRADING_TIMEOUT_H, LOOKBACK_PERIOD_H, check_if_candles_are_consistent
+from functions import setup_logging
 from enum import Enum
 
 class AnalysisResultCode(Enum):
