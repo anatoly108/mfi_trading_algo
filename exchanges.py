@@ -1,6 +1,7 @@
 import yaml
 from abc import ABC, abstractmethod
 from binance.client import Client as BinanceClient
+import binance
 from pymexc import spot
 import os
 import logging
@@ -31,8 +32,11 @@ def retry_decorator(max_retries=3, delay=1):
                         attempt += 1
                         time.sleep(delay)
                         continue
-                        
-                    logging.error(f"An error occurred: {func.__name__} {e.__class__.__name__}: {e}")
+                    
+                    symbol = ""
+                    if "symbol" in kwargs.keys():
+                        symbol = f" Symbol: '{kwargs["symbol"]}'"
+                    logging.error(f"An error occurred: {func.__name__} {e.__class__.__name__}: {e}{symbol}")
                     raise e
 
             raise Exception(f"Failed after {max_retries} attempts")
@@ -87,7 +91,7 @@ class Exchange(metaclass=RetryMeta):
 
     # Abstract methods to be implemented by child classes
     @abstractmethod
-    def get_candles(self, symbol: str, interval: str, limit: int, startTime: int, endTime: int):
+    def get_candles(self, symbol: str, interval: str, limit: int, startTime: int, endTime: int, market="spot"):
         pass
 
     @abstractmethod
@@ -127,8 +131,14 @@ class Binance(Exchange):
         super().__init__(config_path, semaphore)
     
     @semaphore_decorator()
-    def get_candles(self, symbol: str, interval: str, limit: int, startTime: int, endTime: int):
-        candles = BinanceClient().get_klines(symbol=symbol, interval=interval, limit=limit, startTime=startTime, endTime=endTime)
+    def get_candles(self, symbol: str, interval: str, limit: int, startTime: int, endTime: int, market="spot"):
+        if market == "spot":
+            candles = BinanceClient().get_klines(symbol=symbol, interval=interval, limit=limit, startTime=startTime, endTime=endTime)
+        elif market == "futures":
+            candles = BinanceClient().futures_klines(symbol=symbol, interval=interval, limit=limit, startTime=startTime, endTime=endTime)
+        else:
+            raise Exception(f"Unknown market: {market}")
+
         # time, open, high, low, close, volume
         formatted_candles = [
             [int(candle[0]), float(candle[1]), float(candle[2]), float(candle[3]), float(candle[4]), float(candle[5])]
@@ -230,7 +240,7 @@ class Mexc(Exchange):
         self.client = spot.HTTP(api_key=self.api_key, api_secret=self.api_secret)
 
     @semaphore_decorator()
-    def get_candles(self, symbol: str, interval: str, limit: int, startTime: int, endTime: int):
+    def get_candles(self, symbol: str, interval: str, limit: int, startTime: int, endTime: int, market="spot"):
         # Fetch Kline/Candlestick data
         candles = self.client.klines(symbol=symbol, interval=interval, limit=limit, start_time=startTime, end_time=endTime)
         # time, open, high, low, close, volume
