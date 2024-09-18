@@ -238,6 +238,7 @@ class Binance(Exchange):
         return oi_data
 
     def get_funding_rate(self, symbol):
+        # https://fapi.binance.com/fapi/v1/fundingRate?symbol=BTCUSDT&limit=1
         response = BinanceClient().futures_funding_rate(
             symbol=symbol,
             limit=1
@@ -245,7 +246,7 @@ class Binance(Exchange):
         if len(response) == 0:
             return None
 
-        return response[0]["fundingRate"]
+        return float(response[0]["fundingRate"]) * 100
 
 class Mexc(Exchange):
     def __init__(self, config_path="", semaphore=None):
