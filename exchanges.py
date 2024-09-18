@@ -126,6 +126,10 @@ class Exchange(metaclass=RetryMeta):
     def get_open_interest(self, symbol, interval, startTime=None, endTime=None):
         pass
 
+    @abstractmethod
+    def get_funding_rate(self, symbol):
+        pass
+
 class Binance(Exchange):
     def __init__(self, config_path="", semaphore=None):
         super().__init__(config_path, semaphore)
@@ -232,6 +236,16 @@ class Binance(Exchange):
             oi_data.append(float(data_point['sumOpenInterest']))
 
         return oi_data
+
+    def get_funding_rate(self, symbol):
+        response = BinanceClient().futures_funding_rate(
+            symbol=symbol,
+            limit=1
+        )
+        if len(response) == 0:
+            return None
+
+        return response[0]["fundingRate"]
 
 class Mexc(Exchange):
     def __init__(self, config_path="", semaphore=None):
