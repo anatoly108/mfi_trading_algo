@@ -12,6 +12,9 @@ import time
 import concurrent.futures
 import signal
 import sys
+import json
+import xgboost as xgb
+import joblib
 from multiprocessing import current_process, Manager
 from mfi_functions import calculate_mfi, \
                             find_extrema, get_candles, MFI_TIMEINTERVAL, \
@@ -88,16 +91,41 @@ if __name__ == "__main__":
                                                           vol_threshold=args.vol_threshold)
         logging.disable(logging.NOTSET)
 
-        analysis_df_sub = analysis_df[(analysis_df.pnl > args.pnl_min) & 
-                                      (analysis_df.pnl < args.pnl_max) & 
-                                      (analysis_df.liquidity_score > args.liq_min) &
-                                      (analysis_df.liquidity_score < args.liq_max) &
-                                      (analysis_df.volatility_score != 1) &  # volatility_score = 1 are too crazy weird coins
-                                      (analysis_df.empty_candles_fraction <= args.empty_candles_fraction) &
-                                      (analysis_df.ema100_latest_normalized > analysis_df.ema200_latest_normalized)] # EMA uptrend
+        analysis_df = analysis_df[(analysis_df.volatility_score != 1) &  # volatility_score = 1 are too crazy weird coins
+                                 (analysis_df.empty_candles_fraction <= args.empty_candles_fraction)] # EMA uptrend
 
-        analysis_df_sub = analysis_df_sub.sort_values(by='total_profit', ascending=False)
-        chosen_assets = list(analysis_df_sub["symbol"])[:min(analysis_df_sub.shape[0], args.n_assets_to_trade)]
+        # XGBoost part
+        scaler = joblib.load('ml/2024_09_20_binance_6months_4hours_scaler.pkl')
+        final_model = joblib.load('ml/2024_09_20_binance_6months_4hours_xgboost.pkl')
+        with open('ml/2024_09_20_binance_6months_4hours_values.json', 'r') as f:
+            model_values = json.load(f)
+        xgboost_columns = model_values["xgboost_columns"]
+        xgboost_columns = [i for i in xgboost_columns if i != "Y"]
+        
+        xgboost_columns.append("symbol")
+        X_new = analysis_df[xgboost_columns]
+        X_new = X_new.dropna()
+        X_new_symbols = list(X_new["symbol"])
+        X_new.drop('symbol', axis=1, inplace=True)
+        X_new_np = X_new.values
+        X_new_scaled = scaler.transform(X_new_np)
+        dnew = xgb.DMatrix(X_new_scaled)
+        y_pred_proba = final_model.predict(dnew)
+        # Class 3 is the positive pnl class; meaning it's column 2
+        pos_class_proba = list(y_pred_proba[:,2])
+        xgboost_results_df = pd.DataFrame({
+            'symbol': X_new_symbols,
+            'xgboost_score': pos_class_proba
+        })
+
+        analysis_df = pd.merge(analysis_df, xgboost_results_df, on='symbol', how='outer')
+        analysis_df = analysis_df[analysis_df["xgboost_score"] > model_values["high_confidence_score"]].reset_index(drop=True)
+        analysis_df = analysis_df.sort_values(by='xgboost_score', ascending=False)
+        logging.info(f"Number of high confidence assets: {analysis_df.shape[0]}")
+        logging.info(min(analysis_df["xgboost_score"]))
+        logging.info(max(analysis_df["xgboost_score"]))
+
+        chosen_assets = list(analysis_df["symbol"])[:min(analysis_df.shape[0], args.n_assets_to_trade)]
 
         if len(chosen_assets) == 0:
             logging.info(f"Analysis finished, no assets chosen")
