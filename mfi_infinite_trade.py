@@ -122,16 +122,15 @@ if __name__ == "__main__":
         analysis_df = analysis_df[analysis_df["xgboost_score"] > model_values["high_confidence_score"]].reset_index(drop=True)
         analysis_df = analysis_df.sort_values(by='xgboost_score', ascending=False)
         logging.info(f"Number of high confidence assets: {analysis_df.shape[0]}")
-        logging.info(min(analysis_df["xgboost_score"]))
-        logging.info(max(analysis_df["xgboost_score"]))
-
         chosen_assets = list(analysis_df["symbol"])[:min(analysis_df.shape[0], args.n_assets_to_trade)]
 
         if len(chosen_assets) == 0:
             logging.info(f"Analysis finished, no assets chosen")
             time.sleep(60 * 60) # sleep for an hour if there are no good assets to trade on
             continue
-
+        
+        logging.info(min(analysis_df["xgboost_score"]))
+        logging.info(max(analysis_df["xgboost_score"]))
         logging.info(f"Analysis finished, chosen assets: {chosen_assets}")
 
         with concurrent.futures.ProcessPoolExecutor(max_workers=args.n_assets_to_trade) as executor:
