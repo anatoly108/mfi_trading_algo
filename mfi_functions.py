@@ -28,10 +28,10 @@ MFI_THRESHOLD_HIGH_MIN = 50
 
 MFI_STEP_THRESHOLD = 3
 MFI_TIMEINTERVAL = 14
-MFI_TRADING_TIMEOUT_H = 4
+MFI_TRADING_TIMEOUT_H = 2
 LOOKBACK_PERIOD_H = 24 # analysis is based on past 24h
 
-VOL_THRESHOLD = 100e3
+VOL_THRESHOLD = 500e3
 
 # Global termination flag
 termination_flag = multiprocessing.Value('i', 0)

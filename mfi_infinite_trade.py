@@ -92,12 +92,12 @@ if __name__ == "__main__":
         logging.disable(logging.NOTSET)
 
         analysis_df = analysis_df[(analysis_df.volatility_score != 1) &  # volatility_score = 1 are too crazy weird coins
-                                 (analysis_df.empty_candles_fraction <= args.empty_candles_fraction)] # EMA uptrend
+                                 (analysis_df.empty_candles_fraction <= args.empty_candles_fraction)]
 
         # XGBoost part
-        scaler = joblib.load('ml/2024_09_20_binance_6months_4hours_scaler.pkl')
-        final_model = joblib.load('ml/2024_09_20_binance_6months_4hours_xgboost.pkl')
-        with open('ml/2024_09_20_binance_6months_4hours_values.json', 'r') as f:
+        scaler = joblib.load('ml/2024_09_21_binance_6months_2hours_scaler.pkl')
+        final_model = joblib.load('ml/2024_09_21_binance_6months_2hours_xgboost.pkl')
+        with open('ml/2024_09_21_binance_6months_2hours_values.json', 'r') as f:
             model_values = json.load(f)
         xgboost_columns = model_values["xgboost_columns"]
         xgboost_columns = [i for i in xgboost_columns if i != "Y"]
