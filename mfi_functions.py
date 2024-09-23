@@ -317,7 +317,6 @@ def write_trading_results(results, global_results_csv, global_trades_csv, additi
     logging.info(f"Writing individual trades to files")
     trades = []
     for result in results:
-        
         for i in range(len(result["buy_signals"])):
             buy_signal = result["buy_signals"][i]
             if len(result["sell_signals"]) < i + 1:
@@ -337,7 +336,6 @@ def write_trading_results(results, global_results_csv, global_trades_csv, additi
             candle_sell = result["candles"][sell_signal]
             candle_sell_time = candle_sell[0]
             candle_sell_close = candle_sell[4]
-
             trade_dict = {
                 "symbol": result["symbol"],
                 "i": i,
@@ -347,6 +345,7 @@ def write_trading_results(results, global_results_csv, global_trades_csv, additi
                 "mfi_i_sell": mfi_i_sell,
                 "buy_price": result["buy_prices"][i],
                 "sell_price": result["sell_prices"][i],
+                "fee": result["trades_fees"][i],
                 "profit": profit,
                 "candle_buy_time": candle_buy_time,
                 "candle_buy_close": candle_buy_close,
@@ -392,6 +391,7 @@ def run_mfi_trading_algo(symbol, dry_run, exchange_client,
     bought = False
     really_new_candles = []
     total_profit = 0
+    total_fee = 0
     total_profit_minus_fees = 0
     buy_signals = []
     sell_signals = []
@@ -400,6 +400,7 @@ def run_mfi_trading_algo(symbol, dry_run, exchange_client,
     buy_prices = []
     sell_prices = []
     profits = []
+    fees = []
     candles_since_buy = 0
     iteration = 0
     candles_above_threshold = 0  # Initialize candles_above_threshold
@@ -509,8 +510,15 @@ def run_mfi_trading_algo(symbol, dry_run, exchange_client,
                 buy_final = buy_price * quantity
                 
                 profit = sell_final - buy_final
+                fee = (buy_final + sell_final) * exchange_client.get_taker_fee_fraction()
+                
+                total_fee += fee
                 total_profit += profit
+                total_profit_minus_fees += profit - fee
+                
                 profits.append(profit)
+                fees.append(fee)
+
                 logging.info(f"Current trade profit: {profit} USDT")
                 logging.info(f"Total profit: {total_profit} USDT")
             else:
@@ -565,9 +573,7 @@ def run_mfi_trading_algo(symbol, dry_run, exchange_client,
             logging.info(f"Running time exceeded {MFI_TRADING_TIMEOUT_H} hours. Exiting.")
             break
 
-    total_profit_minus_fees = total_profit - (len(buy_signals) + len(sell_signals))*usdt_amount_final*exchange_client.get_taker_fee_fraction()
-
-    logging.info(f"Finished. Total profit: {total_profit}, minus fees: {total_profit_minus_fees}")
+    logging.info(f"Finished. Total profit: ${total_profit}, fees: ${total_fee}, total profit minus fees: ${total_profit_minus_fees}")
 
     res_dict = {
             "symbol": symbol,
@@ -575,14 +581,16 @@ def run_mfi_trading_algo(symbol, dry_run, exchange_client,
             "mfi": mfi,
             "buy_signals": buy_signals,
             "sell_signals": sell_signals,
-            "buy_prices": buy_signals,
-            "sell_prices": sell_signals,
+            "buy_prices": buy_prices,
+            "sell_prices": sell_prices,
+            "trades_fees": fees,
             "total_profit": total_profit,
             "total_profit_minus_fees": total_profit_minus_fees,
             "profits": profits,
             "stop_loss_signals": stop_loss_signals,
             "stop_loss_n": len(stop_loss_signals),
-            "neg_profit_interrupted": neg_profit_interrupted
+            "neg_profit_interrupted": neg_profit_interrupted,
+            "total_fee": total_fee
         }
 
     return(res_dict)
