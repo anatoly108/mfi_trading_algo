@@ -71,3 +71,22 @@ def check_if_candles_are_consistent(symbol, candles, interval):
         return False
     else:
         return True
+
+
+def table(data):
+    """
+    Create a frequency table from categorical data.
+
+    Parameters:
+    - data: List or array of categorical data.
+
+    Returns:
+    - freq_table: A dictionary where keys are unique values and values are frequencies.
+    """
+    freq_table = {}
+    for item in data:
+        if item in freq_table:
+            freq_table[item] += 1
+        else:
+            freq_table[item] = 1
+    return freq_table
