@@ -35,7 +35,7 @@ def retry_decorator(max_retries=3, delay=1):
                     
                     symbol = ""
                     if "symbol" in kwargs.keys():
-                        symbol = f" Symbol: '{kwargs["symbol"]}'"
+                        symbol = f" Symbol: '{kwargs['symbol']}'"
                     logging.error(f"An error occurred: {func.__name__} {e.__class__.__name__}: {e}{symbol}")
                     raise e
 
