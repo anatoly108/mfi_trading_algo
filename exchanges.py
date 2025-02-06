@@ -12,9 +12,18 @@ import hashlib
 import hmac
 from contextlib import nullcontext
 
-def retry_decorator(max_retries=3, delay=1):
+def retry_decorator(max_retries=3, delay=1, retry_exceptions=()):
     """
-    A decorator to retry a function call in case of ConnectionError.
+    A decorator to retry a function call in case of ConnectionError,
+    ReadTimeout, or additional exceptions specified by the user.
+
+    Parameters:
+        max_retries (int): Maximum number of retry attempts.
+        delay (int): Delay in seconds between retries.
+        retry_exceptions (tuple): Additional exception classes to retry on.
+    
+    Returns:
+        The decorated function that retries when specified exceptions occur.
     """
     def decorator(func):
         def wrapper(*args, **kwargs):
@@ -27,18 +36,24 @@ def retry_decorator(max_retries=3, delay=1):
                     attempt += 1
                     time.sleep(delay)
                 except Exception as e:
-                    if hasattr(e, 'code') and e.code == 429:  # Too Many Requests error code
+                    # If the exception has an attribute 'code' and it equals 429 (Too Many Requests), retry.
+                    if hasattr(e, 'code') and e.code == 429:
                         logging.warning(f"{func.__name__} {e.__class__.__name__}: {e}. Too many requests. Retrying... {attempt + 1}/{max_retries}")
                         attempt += 1
                         time.sleep(delay)
                         continue
-                    
+                    # If the exception is in the additional retry_exceptions tuple, retry.
+                    if retry_exceptions and isinstance(e, retry_exceptions):
+                        logging.warning(f"{func.__name__} {e.__class__.__name__}: {e}. Retrying... {attempt + 1}/{max_retries}")
+                        attempt += 1
+                        time.sleep(delay)
+                        continue
+                    # Otherwise, log the error (with symbol info if present) and re-raise the exception.
                     symbol = ""
-                    if "symbol" in kwargs.keys():
+                    if "symbol" in kwargs:
                         symbol = f" Symbol: '{kwargs['symbol']}'"
                     logging.error(f"An error occurred: {func.__name__} {e.__class__.__name__}: {e}{symbol}")
                     raise e
-
             raise Exception(f"Failed after {max_retries} attempts")
         return wrapper
     return decorator
