@@ -151,8 +151,7 @@ class Binance(Exchange):
                 elif symbol['symbol'].endswith('USDC'):
                     usdc_pairs.append(symbol['symbol'])
 
-        # Now filter out USDC pairs that have a corresponding USDT pair
-        final_pairs = usdt_pairs + [usdc for usdc in usdc_pairs if usdc.replace('USDC', 'USDT') not in usdt_pairs]
+        final_pairs = usdt_pairs + usdc_pairs
 
         return final_pairs
 
@@ -314,8 +313,7 @@ class Mexc(Exchange):
             usdt_symbols = [symbol for symbol in symbols if symbol.endswith("USDT")]
             usdc_symbols = [symbol for symbol in symbols if symbol.endswith("USDC")]
 
-            # Keep USDC only if the corresponding USDT doesn't exist
-            final_symbols = usdt_symbols + [usdc for usdc in usdc_symbols if usdc.replace("USDC", "USDT") not in usdt_symbols]
+            final_symbols = usdt_symbols + usdc_symbols
 
             return(final_symbols)
         else:
