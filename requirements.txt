@@ -1,0 +1,33 @@
+# Core data and analysis
+numpy
+pandas
+requests
+scipy
+tqdm
+PyYAML
+
+# Plotting
+matplotlib
+mplfinance
+plotly
+
+# Technical analysis
+TA-Lib
+
+# Exchange APIs
+python-binance
+pymexc
+
+# File export
+openpyxl
+
+# ML / model inference / training
+xgboost
+scikit-learn
+joblib
+optuna
+optuna-integration
+
+# GPU-only training dependency:
+# install the CuPy build that matches your CUDA version manually, for example:
+# cupy-cuda12x
