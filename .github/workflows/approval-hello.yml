@@ -1,0 +1,33 @@
+name: Approval Hello Artifact
+
+on:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  prepare:
+    name: Prepare
+    runs-on: ubuntu-latest
+    steps:
+      - name: Describe upcoming gated step
+        run: |
+          echo "The next job is attached to the manual-approval environment."
+          echo "Configure required reviewers for that environment in GitHub settings."
+
+  create_artifact:
+    name: Create Hello Artifact
+    runs-on: ubuntu-latest
+    needs: prepare
+    environment:
+      name: manual-approval
+    steps:
+      - name: Create hello world file
+        run: printf 'hello world\n' > hello.txt
+
+      - name: Upload artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: hello-world
+          path: hello.txt
