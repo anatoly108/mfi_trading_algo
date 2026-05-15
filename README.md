@@ -1,4 +1,4 @@
-# ML-drive MFI algo trading
+# ML-driven MFI algo trading
 
 Utilities for researching and running a Money Flow Index (MFI) based crypto trading workflow on Binance and MEXC.
 
